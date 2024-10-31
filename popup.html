@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Recharge</title>
+  <link rel="stylesheet" href="popup.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="container">
+    <h1>Recharge</h1>
+    
+    <div class="reminders-container">
+      <div class="reminder-card">
+        <div class="reminder-header">
+          <span>👀 Blink Break</span>
+          <label class="switch">
+            <input type="checkbox" id="blinkToggle">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="interval-slider">
+          <input type="range" min="0" max="60" value="20" id="blinkInterval">
+          <div class="interval-value">
+            <span id="blinkValue">20</span> min
+          </div>
+        </div>
+      </div>
+
+      <div class="reminder-card">
+        <div class="reminder-header">
+          <span>💧 Water Break</span>
+          <label class="switch">
+            <input type="checkbox" id="waterToggle">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="interval-slider">
+          <input type="range" min="0" max="60" value="30" id="waterInterval">
+          <div class="interval-value">
+            <span id="waterValue">30</span> min
+          </div>
+        </div>
+      </div>
+
+      <div class="reminder-card">
+        <div class="reminder-header">
+          <span>🚶 Movement Break</span>
+          <label class="switch">
+            <input type="checkbox" id="upToggle">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="interval-slider">
+          <input type="range" min="0" max="60" value="45" id="upInterval">
+          <div class="interval-value">
+            <span id="upValue">45</span> min
+          </div>
+        </div>
+      </div>
+
+      <div class="reminder-card">
+        <div class="reminder-header">
+          <span>🧘 Stretch Break</span>
+          <label class="switch">
+            <input type="checkbox" id="stretchToggle">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="interval-slider">
+          <input type="range" min="0" max="60" value="40" id="stretchInterval">
+          <div class="interval-value">
+            <span id="stretchValue">40</span> min
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="sound-toggle">
+        <span>🔔 Notification Sound</span>
+        <label class="switch">
+          <input type="checkbox" id="soundToggle">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="support-section">
+      <a href="https://github.com/Troyanovsky/plugin-recharge" target="_blank" class="github-link">
+        👨‍💻 Created by Troy
+      </a>
+      <a href="https://www.buymeacoffee.com/troyanovsky" target="_blank" class="bmc-button">
+        🍺 Buy me a beer
+      </a>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html> 
