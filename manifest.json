@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Recharge - Relaxation Reminder",
+  "name": "Recharge - Healthy Work Break Reminders",
   "version": "1.0",
-  "description": "Reminds you to take breaks, blink, drink water, and stretch during work",
+  "description": "Stay healthy at your desk with customizable reminders for eye breaks, hydration, movement, and stretching.",
   "permissions": ["notifications", "storage", "alarms"],
   "action": {
     "default_popup": "popup.html",
