@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Recharge",
+  "name": "Recharge - Relaxation Reminder",
   "version": "1.0",
   "description": "Reminds you to take breaks, blink, drink water, and stretch during work",
   "permissions": ["notifications", "storage", "alarms"],

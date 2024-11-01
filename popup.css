@@ -154,7 +154,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
   color: var(--text-color);
   text-decoration: none;
   border-radius: var(--border-radius);
-  font-family: 'Cookie', cursive;
+  font-family: 'Arial', sans-serif;
   font-size: 18px;
   border: 2px solid #000000;
   transition: all 0.3s ease;
@@ -162,6 +162,25 @@ input[type="range"]::-webkit-slider-thumb:hover {
 
 .bmc-button:hover {
   background-color: #FFE44D;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.github-link {
+  display: inline-block;
+  padding: 10px 20px;
+  background-color: #fff;
+  color: var(--text-color);
+  text-decoration: none;
+  border-radius: var(--border-radius);
+  font-size: 16px;
+  border: 2px solid #ffffff;
+  transition: all 0.3s ease;
+  margin-bottom: 12px;
+}
+
+.github-link:hover {
+  background-color: #f1f5f9;
   transform: translateY(-2px);
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
