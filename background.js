@@ -5,7 +5,7 @@ const NOTIFICATION_MESSAGES = {
   stretch: "Time to do some stretching exercises!"
 };
 
-const DEBUG_MODE = true;  // Set this to false to disable debug logging
+const DEBUG_MODE = false;  // Set this to false to disable debug logging
 
 chrome.runtime.onInstalled.addListener(() => {
   if (DEBUG_MODE) console.log('Extension installed/updated');
@@ -20,13 +20,13 @@ chrome.runtime.onInstalled.addListener(() => {
   ], (result) => {
     const defaultSettings = {
       blinkEnabled: result.blinkEnabled ?? false,
-      blinkInterval: result.blinkInterval ?? 20,
+      blinkInterval: result.blinkInterval ?? 10,
       waterEnabled: result.waterEnabled ?? false,
       waterInterval: result.waterInterval ?? 30,
       upEnabled: result.upEnabled ?? false,
-      upInterval: result.upInterval ?? 45,
+      upInterval: result.upInterval ?? 40,
       stretchEnabled: result.stretchEnabled ?? false,
-      stretchInterval: result.stretchInterval ?? 40,
+      stretchInterval: result.stretchInterval ?? 35,
       soundEnabled: result.soundEnabled ?? true
     };
     if (DEBUG_MODE) console.log('Default settings:', defaultSettings);
