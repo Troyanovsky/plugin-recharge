@@ -7,6 +7,10 @@
   --spacing: 16px;
 }
 
+html {
+  height: 600px;
+}
+
 body {
   width: 320px;
   margin: 0;
