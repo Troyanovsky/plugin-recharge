@@ -38,3 +38,7 @@ A Chrome extension that helps you maintain healthy habits while working at your 
 - Support development by [buying me a beer](https://www.buymeacoffee.com/troyanovsky)
 
 Created by [Troy](https://github.com/Troyanovsky)
+
+## Changelog
+
+- V1.0 2024-11-03 - Initial release. Supports Blink, Water, Movement, and Stretch reminders.
