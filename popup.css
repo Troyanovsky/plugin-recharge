@@ -191,3 +191,27 @@ input[type="range"]::-webkit-slider-thumb:hover {
 
 /* Optional: Add Cookie font if you want to match the original widget */
 @import url('https://fonts.googleapis.com/css2?family=Cookie&display=swap');
+
+.timer-button {
+  padding: 6px 16px;
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.timer-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.timer-button:disabled {
+  background-color: #94a3b8;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}

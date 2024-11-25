@@ -2,7 +2,8 @@ const NOTIFICATION_MESSAGES = {
   blink: "Time to blink your eyes! Look away from the screen for 20 seconds.",
   water: "Time to drink some water! Stay hydrated!",
   up: "Time to get up and walk around for a few minutes!",
-  stretch: "Time to do some stretching exercises!"
+  stretch: "Time to do some stretching exercises!",
+  oneTime: "Your timer is up!"
 };
 
 const DEBUG_MODE = false;  // Set this to false to disable debug logging
@@ -40,6 +41,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'updateAlarms') {
     updateAlarms(message.settings);
   }
+  if (message.action === 'createOneTimeTimer') {
+    chrome.alarms.create('oneTime', {
+      delayInMinutes: message.minutes
+    });
+    if (DEBUG_MODE) console.log(`Created one-time timer for ${message.minutes} minutes`);
+  }
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
@@ -55,15 +62,20 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     });
     if (DEBUG_MODE) console.log(`Notification created for ${alarm.name}, sound ${result.soundEnabled ? 'enabled' : 'disabled'}`);
 
-    // Restart the alarm
-    chrome.storage.sync.get([`${alarm.name}Interval`], (result) => {
-      if (result[`${alarm.name}Interval`]) {
-        chrome.alarms.create(alarm.name, {
-          delayInMinutes: result[`${alarm.name}Interval`]
-        });
-        if (DEBUG_MODE) console.log(`Alarm reset: ${alarm.name} for ${result[`${alarm.name}Interval`]} minutes`);
-      }
-    });
+    if (alarm.name === 'oneTime') {
+      // Notify popup that timer is complete
+      chrome.runtime.sendMessage({ action: 'timerComplete' });
+    } else {
+      // Restart repeating alarms as before
+      chrome.storage.sync.get([`${alarm.name}Interval`], (result) => {
+        if (result[`${alarm.name}Interval`]) {
+          chrome.alarms.create(alarm.name, {
+            delayInMinutes: result[`${alarm.name}Interval`]
+          });
+          if (DEBUG_MODE) console.log(`Alarm reset: ${alarm.name} for ${result[`${alarm.name}Interval`]} minutes`);
+        }
+      });
+    }
   });
 });
 
