@@ -5,7 +5,8 @@ document.addEventListener('DOMContentLoaded', () => {
     'waterEnabled', 'waterInterval',
     'upEnabled', 'upInterval',
     'stretchEnabled', 'stretchInterval',
-    'soundEnabled'
+    'soundEnabled',
+    'waterLogCount', 'waterLogDate'
   ], (result) => {
     // Set toggle states
     document.getElementById('blinkToggle').checked = result.blinkEnabled ?? false;
@@ -22,6 +23,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Update display values
     updateDisplayValues();
+    
+    // Update water log counter
+    const today = new Date().toDateString();
+    const waterLogDate = result.waterLogDate || '';
+    const waterLogCount = (waterLogDate === today) ? (result.waterLogCount || 0) : 0;
+    
+    updateWaterLogBadge(waterLogCount);
   });
 
   // Add event listeners for all inputs
@@ -68,12 +76,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Listen for timer completion
+  // Listen for timer completion and water logged events
   chrome.runtime.onMessage.addListener((message) => {
     if (message.action === 'timerComplete') {
       startTimerBtn.disabled = false;
       startTimerBtn.textContent = 'Start';
       clearInterval(countdownInterval);
+    } else if (message.action === 'waterLogged') {
+      updateWaterLogBadge(message.count);
     }
   });
 
@@ -88,6 +98,12 @@ function updateDisplayValues() {
   document.getElementById('waterValue').textContent = document.getElementById('waterInterval').value;
   document.getElementById('upValue').textContent = document.getElementById('upInterval').value;
   document.getElementById('stretchValue').textContent = document.getElementById('stretchInterval').value;
+}
+
+function updateWaterLogBadge(count) {
+  const badge = document.getElementById('waterLogBadge');
+  badge.textContent = count;
+  badge.style.display = count > 0 ? 'flex' : 'none';
 }
 
 function saveSettings() {
@@ -114,4 +130,4 @@ function updateButtonCountdown(endTime) {
   const seconds = Math.floor((remaining % 60000) / 1000);
   const formattedTime = `${minutes}:${seconds.toString().padStart(2, '0')}`;
   document.getElementById('startTimerBtn').textContent = formattedTime;
-} 
+}
