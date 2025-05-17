@@ -215,3 +215,32 @@ input[type="range"]::-webkit-slider-thumb:hover {
   transform: none;
   box-shadow: none;
 }
+
+/* Add this to the end of your existing CSS file */
+
+.water-log-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--primary-color);
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  margin-left: 8px;
+}
+
+.reminder-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+
+.reminder-header span {
+  display: flex;
+  align-items: center;
+}

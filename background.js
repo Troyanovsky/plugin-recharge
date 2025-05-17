@@ -17,8 +17,10 @@ chrome.runtime.onInstalled.addListener(() => {
     'waterEnabled', 'waterInterval',
     'upEnabled', 'upInterval',
     'stretchEnabled', 'stretchInterval',
-    'soundEnabled'
+    'soundEnabled',
+    'waterLogCount', 'waterLogDate'
   ], (result) => {
+    const today = new Date().toDateString();
     const defaultSettings = {
       blinkEnabled: result.blinkEnabled ?? false,
       blinkInterval: result.blinkInterval ?? 10,
@@ -28,7 +30,9 @@ chrome.runtime.onInstalled.addListener(() => {
       upInterval: result.upInterval ?? 40,
       stretchEnabled: result.stretchEnabled ?? false,
       stretchInterval: result.stretchInterval ?? 35,
-      soundEnabled: result.soundEnabled ?? true
+      soundEnabled: result.soundEnabled ?? true,
+      waterLogCount: (result.waterLogDate === today) ? result.waterLogCount : 0,
+      waterLogDate: today
     };
     if (DEBUG_MODE) console.log('Default settings:', defaultSettings);
     
@@ -49,18 +53,93 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
+// Handle notification button clicks
+chrome.notifications.onButtonClicked.addListener((notificationId, buttonIndex) => {
+  if (notificationId.startsWith('water_')) {
+    if (buttonIndex === 0) { // Log Water button clicked
+      // Get current date and water log count
+      chrome.storage.sync.get(['waterLogCount', 'waterLogDate'], (result) => {
+        const today = new Date().toDateString();
+        let waterLogCount = result.waterLogCount || 0;
+        const waterLogDate = result.waterLogDate || '';
+        
+        // Reset counter if it's a new day
+        if (waterLogDate !== today) {
+          waterLogCount = 0;
+        }
+        
+        // Increment water log count
+        waterLogCount++;
+        
+        // Save updated count and date
+        chrome.storage.sync.set({
+          waterLogCount: waterLogCount,
+          waterLogDate: today
+        }, () => {
+          if (DEBUG_MODE) console.log(`Water logged! Count: ${waterLogCount}`);
+          // Notify popup to update the counter display
+          chrome.runtime.sendMessage({ action: 'waterLogged', count: waterLogCount });
+        });
+      });
+    }
+    // For both buttons, clear the notification
+    chrome.notifications.clear(notificationId);
+  }
+});
+
+// Helper function to create notifications with consistent options
+function createNotification(alarmName, soundEnabled, options = {}) {
+  const baseOptions = {
+    type: 'basic',
+    iconUrl: 'icons/icon128.png',
+    title: 'Recharge',
+    message: NOTIFICATION_MESSAGES[alarmName],
+    silent: !soundEnabled
+  };
+  
+  // Create a clean copy of options without any custom properties
+  const { isWater, ...cleanOptions } = options;
+  const notificationOptions = { ...baseOptions, ...cleanOptions };
+  const notificationId = isWater ? `water_${Date.now()}` : undefined;
+  
+  chrome.notifications.create(notificationId, notificationOptions, (createdId) => {
+    if (chrome.runtime.lastError) {
+      console.error('Notification error:', chrome.runtime.lastError);
+    } else if (DEBUG_MODE && createdId) {
+      console.log(`Notification created with ID: ${createdId}`);
+    }
+  });
+  
+  if (DEBUG_MODE) {
+    console.log(`Notification created for ${alarmName}, sound ${soundEnabled ? 'enabled' : 'disabled'}`);
+  }
+  
+  return notificationId;
+}
+
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (DEBUG_MODE) console.log(`Alarm triggered: ${alarm.name}`);
   
   chrome.storage.sync.get(['soundEnabled'], (result) => {
-    chrome.notifications.create({
-      type: 'basic',
-      iconUrl: 'icons/icon128.png',
-      title: 'Recharge',
-      message: NOTIFICATION_MESSAGES[alarm.name],
-      silent: !result.soundEnabled
-    });
-    if (DEBUG_MODE) console.log(`Notification created for ${alarm.name}, sound ${result.soundEnabled ? 'enabled' : 'disabled'}`);
+    if (alarm.name === 'water') {
+      // Create notification with buttons for water alarm
+      // Detect if user is on macOS
+      const isMacOS = /Mac|MacIntel/.test(navigator.userAgent);
+      
+      if (DEBUG_MODE) console.log(`Platform detected: ${isMacOS ? 'macOS' : 'other'}, setting requireInteraction to ${!isMacOS}`);
+      
+      createNotification(alarm.name, result.soundEnabled, {
+        buttons: [
+          { title: 'Log Water' },
+          { title: 'Skip' }
+        ],
+        requireInteraction: !isMacOS, // Set to false on macOS, true on other platforms
+        isWater: true // This is a custom property that will be extracted before creating the notification
+      });
+    } else {
+      // Regular notification for other alarms
+      createNotification(alarm.name, result.soundEnabled);
+    }
 
     if (alarm.name === 'oneTime') {
       // Notify popup that timer is complete
@@ -80,36 +159,52 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 });
 
 function updateAlarms(settings) {
-  // Clear all existing alarms
-  chrome.alarms.clearAll();
-  if (DEBUG_MODE) console.log('Cleared all existing alarms');
-
-  // Create new alarms based on settings
-  if (settings.blinkEnabled && settings.blinkInterval > 0) {
-    chrome.alarms.create('blink', {
-      delayInMinutes: settings.blinkInterval
+  // Define alarm types to iterate through
+  const alarmTypes = ['blink', 'water', 'up', 'stretch'];
+  
+  // Get existing alarms to compare
+  chrome.alarms.getAll((existingAlarms) => {
+    // Create a map of existing alarms for easy lookup
+    const existingAlarmsMap = {};
+    existingAlarms.forEach(alarm => {
+      // Only map the repeating alarms (not oneTime)
+      if (alarm.name !== 'oneTime') {
+        existingAlarmsMap[alarm.name] = alarm;
+      }
     });
-    if (DEBUG_MODE) console.log(`Created blink alarm: ${settings.blinkInterval} minutes`);
-  }
-
-  if (settings.waterEnabled && settings.waterInterval > 0) {
-    chrome.alarms.create('water', {
-      delayInMinutes: settings.waterInterval
+    
+    // Update alarms based on settings
+    alarmTypes.forEach(type => {
+      const isEnabled = settings[`${type}Enabled`];
+      const interval = settings[`${type}Interval`];
+      
+      if (isEnabled && interval > 0) {
+        // Check if this alarm already exists
+        const existingAlarm = existingAlarmsMap[type];
+        
+        // If alarm doesn't exist or settings have changed, create/update it
+        if (!existingAlarm) {
+          // Create new alarm
+          chrome.alarms.create(type, {
+            delayInMinutes: interval
+          });
+          if (DEBUG_MODE) console.log(`Created ${type} alarm: ${interval} minutes`);
+        } else {
+          // Only clear and recreate if the interval has changed
+          chrome.alarms.clear(type, (wasCleared) => {
+            if (wasCleared) {
+              chrome.alarms.create(type, {
+                delayInMinutes: interval
+              });
+              if (DEBUG_MODE) console.log(`Updated ${type} alarm: ${interval} minutes`);
+            }
+          });
+        }
+      } else {
+        // If alarm is disabled or interval is 0, clear it
+        chrome.alarms.clear(type);
+        if (DEBUG_MODE) console.log(`Cleared ${type} alarm (disabled or interval=0)`);
+      }
     });
-    if (DEBUG_MODE) console.log(`Created water alarm: ${settings.waterInterval} minutes`);
-  }
-
-  if (settings.upEnabled && settings.upInterval > 0) {
-    chrome.alarms.create('up', {
-      delayInMinutes: settings.upInterval
-    });
-    if (DEBUG_MODE) console.log(`Created up alarm: ${settings.upInterval} minutes`);
-  }
-
-  if (settings.stretchEnabled && settings.stretchInterval > 0) {
-    chrome.alarms.create('stretch', {
-      delayInMinutes: settings.stretchInterval
-    });
-    if (DEBUG_MODE) console.log(`Created stretch alarm: ${settings.stretchInterval} minutes`);
-  }
-} 
+  });
+}
