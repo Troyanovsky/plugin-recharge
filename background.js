@@ -78,7 +78,13 @@ chrome.notifications.onButtonClicked.addListener((notificationId, buttonIndex) =
         }, () => {
           if (DEBUG_MODE) console.log(`Water logged! Count: ${waterLogCount}`);
           // Notify popup to update the counter display
-          chrome.runtime.sendMessage({ action: 'waterLogged', count: waterLogCount });
+          chrome.runtime.sendMessage({ action: 'waterLogged', count: waterLogCount }, () => {
+            // Check for error and ignore it - this happens when popup is not open
+            if (chrome.runtime.lastError) {
+              // Silently handle the error
+              if (DEBUG_MODE) console.log('Popup not open, could not send water logged message');
+            }
+          });
         });
       });
     }
