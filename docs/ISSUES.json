@@ -28,13 +28,13 @@
       "title": "Default value inconsistency between popup.js and background.js",
       "description": "Default interval values are inconsistent between popup.js (blink=20, water=30, up=45, stretch=40) and background.js (blink=10, water=30, up=40, stretch=35). First-time users will see different values in the UI than what's actually stored and used for alarms, causing confusion and incorrect behavior.",
       "acceptance_criteria": [
-        "Default values are identical across all files",
+        "Default values are identical across all files (use popup.js values)",
         "First-time users see consistent values in UI and actual alarm intervals",
         "Single source of truth for default values",
         "Values defined in one place and referenced elsewhere"
       ],
-      "passes": false,
-      "file_references": ["popup.js:19-22", "background.js:26-32"],
+      "passes": true,
+      "file_references": ["popup.js:19-22", "background.js:47,49,51,53"],
       "severity": "high"
     },
     {

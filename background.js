@@ -44,13 +44,13 @@ chrome.runtime.onInstalled.addListener(() => {
     const today = new Date().toDateString();
     const defaultSettings = {
       blinkEnabled: result.blinkEnabled ?? false,
-      blinkInterval: result.blinkInterval ?? 10,
+      blinkInterval: result.blinkInterval ?? 20,
       waterEnabled: result.waterEnabled ?? false,
       waterInterval: result.waterInterval ?? 30,
       upEnabled: result.upEnabled ?? false,
-      upInterval: result.upInterval ?? 40,
+      upInterval: result.upInterval ?? 45,
       stretchEnabled: result.stretchEnabled ?? false,
-      stretchInterval: result.stretchInterval ?? 35,
+      stretchInterval: result.stretchInterval ?? 40,
       soundEnabled: result.soundEnabled ?? true,
       waterLogCount: (result.waterLogDate === today) ? result.waterLogCount : 0,
       waterLogDate: today
