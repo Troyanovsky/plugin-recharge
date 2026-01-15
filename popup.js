@@ -8,6 +8,11 @@ document.addEventListener('DOMContentLoaded', () => {
     'soundEnabled',
     'waterLogCount', 'waterLogDate'
   ], (result) => {
+    if (chrome.runtime.lastError) {
+      console.error('Failed to load settings:', chrome.runtime.lastError);
+      return;
+    }
+
     // Set toggle states
     document.getElementById('blinkToggle').checked = result.blinkEnabled ?? false;
     document.getElementById('waterToggle').checked = result.waterEnabled ?? false;
@@ -23,12 +28,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Update display values
     updateDisplayValues();
-    
+
     // Update water log counter
     const today = new Date().toDateString();
     const waterLogDate = result.waterLogDate || '';
     const waterLogCount = (waterLogDate === today) ? (result.waterLogCount || 0) : 0;
-    
+
     updateWaterLogBadge(waterLogCount);
   });
 
@@ -131,6 +136,10 @@ function saveSettings() {
   };
 
   chrome.storage.sync.set(settings, () => {
+    if (chrome.runtime.lastError) {
+      console.error('Failed to save settings:', chrome.runtime.lastError);
+      return;
+    }
     chrome.runtime.sendMessage({ action: 'updateAlarms', settings });
   });
 }

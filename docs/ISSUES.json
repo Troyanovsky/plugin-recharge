@@ -70,22 +70,6 @@
       "severity": "medium"
     },
     {
-      "id": "BUG-250115-005",
-      "type": "bug",
-      "epic": "Notifications",
-      "title": "Potential notification ID collision with Date.now()",
-      "description": "Water notification IDs are generated using Date.now() with millisecond precision. If user has multiple Chrome profiles or rapid successive water alarms, IDs could collide, causing notifications to overwrite each other or behave unexpectedly.",
-      "acceptance_criteria": [
-        "Notification IDs are guaranteed unique",
-        "Multiple simultaneous water notifications handled correctly",
-        "ID generation prevents collisions in all scenarios",
-        "Button clicks map to correct notification instance"
-      ],
-      "passes": false,
-      "file_references": ["background.js:109"],
-      "severity": "medium"
-    },
-    {
       "id": "BUG-250115-006",
       "type": "bug",
       "epic": "Error Handling",
@@ -97,8 +81,8 @@
         "Errors are logged for debugging",
         "Graceful handling of quota exceeded scenarios"
       ],
-      "passes": false,
-      "file_references": ["background.js:39", "popup.js:122-124"],
+      "passes": true,
+      "file_references": ["background.js:36-72", "popup.js:120-140"],
       "severity": "medium"
     },
     {

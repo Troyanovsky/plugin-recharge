@@ -41,6 +41,11 @@ chrome.runtime.onInstalled.addListener(() => {
     'soundEnabled',
     'waterLogCount', 'waterLogDate'
   ], (result) => {
+    if (chrome.runtime.lastError) {
+      console.error('Failed to read storage during initialization:', chrome.runtime.lastError);
+      return;
+    }
+
     const today = new Date().toDateString();
     const defaultSettings = {
       blinkEnabled: result.blinkEnabled ?? false,
@@ -56,9 +61,14 @@ chrome.runtime.onInstalled.addListener(() => {
       waterLogDate: today
     };
     if (DEBUG_MODE) console.log('Default settings:', defaultSettings);
-    
-    chrome.storage.sync.set(defaultSettings);
-    updateAlarms(defaultSettings);
+
+    chrome.storage.sync.set(defaultSettings, () => {
+      if (chrome.runtime.lastError) {
+        console.error('Failed to save default settings:', chrome.runtime.lastError);
+        return;
+      }
+      updateAlarms(defaultSettings);
+    });
   });
 });
 
