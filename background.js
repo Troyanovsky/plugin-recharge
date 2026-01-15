@@ -29,6 +29,12 @@ let isProcessingWaterLogQueue = false;
 const WATER_LOG_MAX_RETRIES = 5;
 const WATER_LOG_RETRY_DELAY_MS = 500;
 
+// Validation constants for timer and interval values
+const ONE_TIME_MIN = 1;
+const ONE_TIME_MAX = 120;
+const REPEATING_INTERVAL_MIN = 0;
+const REPEATING_INTERVAL_MAX = 60;
+
 chrome.runtime.onInstalled.addListener(() => {
   if (DEBUG_MODE) console.log('Extension installed/updated');
   
@@ -77,12 +83,41 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     updateAlarms(message.settings);
   }
   if (message.action === 'createOneTimeTimer') {
-    chrome.alarms.create('oneTime', {
-      delayInMinutes: message.minutes
-    });
-    if (DEBUG_MODE) console.log(`Created one-time timer for ${message.minutes} minutes`);
+    const minutes = message.minutes;
+    if (isValidAlarmInterval(minutes)) {
+      chrome.alarms.create('oneTime', {
+        delayInMinutes: minutes
+      });
+      if (DEBUG_MODE) console.log(`Created one-time timer for ${minutes} minutes`);
+    } else {
+      console.error(`Invalid one-time timer value: ${minutes}. Must be between ${ONE_TIME_MIN} and ${ONE_TIME_MAX} minutes.`);
+    }
   }
 });
+
+/**
+ * Validates if a value is a valid alarm interval (1-120 minutes for one-time timers).
+ * NOTE: This validation is also performed in popup.js before sending.
+ * This defense-in-depth approach ensures data integrity even if
+ * storage is corrupted or messages are modified in transit.
+ * @param {number} value - The interval value to validate.
+ * @returns {boolean} True if valid, false otherwise.
+ */
+function isValidAlarmInterval(value) {
+  return !isNaN(value) && value >= ONE_TIME_MIN && value <= ONE_TIME_MAX;
+}
+
+/**
+ * Validates if a value is a valid repeating alarm interval (0-60 minutes).
+ * NOTE: This validation is also performed in popup.js before sending.
+ * This defense-in-depth approach ensures data integrity even if
+ * storage is corrupted or messages are modified in transit.
+ * @param {number} value - The interval value to validate.
+ * @returns {boolean} True if valid, false otherwise.
+ */
+function isValidRepeatingInterval(value) {
+  return !isNaN(value) && value >= REPEATING_INTERVAL_MIN && value <= REPEATING_INTERVAL_MAX;
+}
 
 // Handle notification button clicks
 chrome.notifications.onButtonClicked.addListener((notificationId, buttonIndex) => {
@@ -252,11 +287,14 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     } else {
       // Restart repeating alarms as before
       chrome.storage.sync.get([`${alarm.name}Interval`], (result) => {
-        if (result[`${alarm.name}Interval`]) {
+        const interval = result[`${alarm.name}Interval`];
+        if (interval && isValidRepeatingInterval(interval)) {
           chrome.alarms.create(alarm.name, {
-            delayInMinutes: result[`${alarm.name}Interval`]
+            delayInMinutes: interval
           });
-          if (DEBUG_MODE) console.log(`Alarm reset: ${alarm.name} for ${result[`${alarm.name}Interval`]} minutes`);
+          if (DEBUG_MODE) console.log(`Alarm reset: ${alarm.name} for ${interval} minutes`);
+        } else if (interval) {
+          console.error(`Invalid ${alarm.name} interval in storage: ${interval}. Must be between ${REPEATING_INTERVAL_MIN} and ${REPEATING_INTERVAL_MAX} minutes.`);
         }
       });
     }
@@ -266,7 +304,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 function updateAlarms(settings) {
   // Define alarm types to iterate through
   const alarmTypes = ['blink', 'water', 'up', 'stretch'];
-  
+
   // Get existing alarms to compare
   chrome.alarms.getAll((existingAlarms) => {
     // Create a map of existing alarms for easy lookup
@@ -277,16 +315,22 @@ function updateAlarms(settings) {
         existingAlarmsMap[alarm.name] = alarm;
       }
     });
-    
+
     // Update alarms based on settings
     alarmTypes.forEach(type => {
       const isEnabled = settings[`${type}Enabled`];
       const interval = settings[`${type}Interval`];
-      
+
+      // Validate interval before creating alarm
+      if (isEnabled && !isValidRepeatingInterval(interval)) {
+        console.error(`Invalid ${type} interval: ${interval}. Must be between ${REPEATING_INTERVAL_MIN} and ${REPEATING_INTERVAL_MAX} minutes.`);
+        return;
+      }
+
       if (isEnabled && interval > 0) {
         // Check if this alarm already exists
         const existingAlarm = existingAlarmsMap[type];
-        
+
         // If alarm doesn't exist or settings have changed, create/update it
         if (!existingAlarm) {
           // Create new alarm

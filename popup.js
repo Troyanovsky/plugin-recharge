@@ -1,3 +1,9 @@
+// Validation constants for timer and interval values
+const ONE_TIME_MIN = 1;
+const ONE_TIME_MAX = 120;
+const REPEATING_INTERVAL_MIN = 0;
+const REPEATING_INTERVAL_MAX = 60;
+
 document.addEventListener('DOMContentLoaded', () => {
   // Load saved settings
   chrome.storage.sync.get([
@@ -53,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const startTimerBtn = document.getElementById('startTimerBtn');
   const oneTimeInterval = document.getElementById('oneTimeInterval');
   let countdownInterval;
-  
+
   // Update one-time timer display
   oneTimeInterval.addEventListener('input', () => {
     document.getElementById('oneTimeValue').textContent = oneTimeInterval.value;
@@ -61,6 +67,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   startTimerBtn.addEventListener('click', () => {
     const minutes = parseInt(oneTimeInterval.value);
+    if (isNaN(minutes) || minutes < ONE_TIME_MIN || minutes > ONE_TIME_MAX) {
+      alert(`Invalid timer value: ${minutes}. Must be between ${ONE_TIME_MIN} and ${ONE_TIME_MAX} minutes.`);
+      return;
+    }
     startTimerBtn.disabled = true;
 
     // Clear any existing interval to prevent memory leaks
@@ -122,16 +132,37 @@ function updateWaterLogBadge(count) {
   badge.style.display = count > 0 ? 'flex' : 'none';
 }
 
+/**
+ * Validates if a value is a valid repeating alarm interval (0-60 minutes).
+ * @param {number} value - The interval value to validate.
+ * @returns {boolean} True if valid, false otherwise.
+ */
+function isValidInterval(value) {
+  return !isNaN(value) && value >= REPEATING_INTERVAL_MIN && value <= REPEATING_INTERVAL_MAX;
+}
+
 function saveSettings() {
+  const blinkInterval = parseInt(document.getElementById('blinkInterval').value);
+  const waterInterval = parseInt(document.getElementById('waterInterval').value);
+  const upInterval = parseInt(document.getElementById('upInterval').value);
+  const stretchInterval = parseInt(document.getElementById('stretchInterval').value);
+
+  // Validate all interval values
+  if (!isValidInterval(blinkInterval) || !isValidInterval(waterInterval) ||
+      !isValidInterval(upInterval) || !isValidInterval(stretchInterval)) {
+    alert(`Invalid interval value detected. All intervals must be between ${REPEATING_INTERVAL_MIN} and ${REPEATING_INTERVAL_MAX} minutes.`);
+    return;
+  }
+
   const settings = {
     blinkEnabled: document.getElementById('blinkToggle').checked,
-    blinkInterval: parseInt(document.getElementById('blinkInterval').value),
+    blinkInterval: blinkInterval,
     waterEnabled: document.getElementById('waterToggle').checked,
-    waterInterval: parseInt(document.getElementById('waterInterval').value),
+    waterInterval: waterInterval,
     upEnabled: document.getElementById('upToggle').checked,
-    upInterval: parseInt(document.getElementById('upInterval').value),
+    upInterval: upInterval,
     stretchEnabled: document.getElementById('stretchToggle').checked,
-    stretchInterval: parseInt(document.getElementById('stretchInterval').value),
+    stretchInterval: stretchInterval,
     soundEnabled: document.getElementById('soundToggle').checked
   };
 

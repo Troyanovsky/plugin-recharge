@@ -113,8 +113,8 @@
         "NaN, negative, and out-of-range values rejected",
         "User feedback on invalid input"
       ],
-      "passes": false,
-      "file_references": ["popup.js:58", "popup.js:112-119", "background.js:49-51", "background.js:157-159"],
+      "passes": true,
+      "file_references": ["popup.js:66-68", "popup.js:141-145", "popup.js:168-170", "background.js:81-88", "background.js:97-108", "background.js:310-313", "background.js:279-286"],
       "severity": "medium"
     },
     {
@@ -161,8 +161,8 @@
         "No visual changes to the UI",
         "CSS file reduced by one redundant definition"
       ],
-      "passes": false,
-      "file_references": ["popup.css:46-52", "popup.css:235-241"],
+      "passes": true,
+      "file_references": ["popup.css:46-52"],
       "severity": "low"
     },
     {
