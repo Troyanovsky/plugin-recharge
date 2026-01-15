@@ -65,7 +65,7 @@
         "No memory leaks from duplicate intervals",
         "Button text updates exactly once per second"
       ],
-      "passes": false,
+      "passes": true,
       "file_references": ["popup.js:57-77"],
       "severity": "medium"
     },

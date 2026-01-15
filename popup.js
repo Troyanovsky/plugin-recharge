@@ -57,13 +57,16 @@ document.addEventListener('DOMContentLoaded', () => {
   startTimerBtn.addEventListener('click', () => {
     const minutes = parseInt(oneTimeInterval.value);
     startTimerBtn.disabled = true;
-    
+
+    // Clear any existing interval to prevent memory leaks
+    clearInterval(countdownInterval);
+
     // Calculate end time
     const endTime = Date.now() + minutes * 60 * 1000;
-    
+
     // Update button text immediately
     updateButtonCountdown(endTime);
-    
+
     // Set up countdown interval
     countdownInterval = setInterval(() => {
       updateButtonCountdown(endTime);
