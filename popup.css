@@ -232,14 +232,6 @@ input[type="range"]::-webkit-slider-thumb:hover {
   margin-left: 8px;
 }
 
-.reminder-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-  font-weight: 500;
-}
-
 .reminder-header span {
   display: flex;
   align-items: center;
