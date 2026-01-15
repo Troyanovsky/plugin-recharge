@@ -49,8 +49,8 @@
         "Error is logged for debugging purposes",
         "UI reflects actual timer state"
       ],
-      "passes": false,
-      "file_references": ["popup.js:73-76"],
+      "passes": true,
+      "file_references": ["popup.js:73-84"],
       "severity": "high"
     },
     {

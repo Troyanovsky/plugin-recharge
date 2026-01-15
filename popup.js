@@ -70,9 +70,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 1000);
 
     // Send message to create one-time alarm
-    chrome.runtime.sendMessage({ 
-      action: 'createOneTimeTimer', 
-      minutes: minutes 
+    chrome.runtime.sendMessage({
+      action: 'createOneTimeTimer',
+      minutes: minutes
+    }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error('Failed to create timer:', chrome.runtime.lastError);
+        // Re-enable button and reset countdown on failure
+        startTimerBtn.disabled = false;
+        startTimerBtn.textContent = 'Start';
+        clearInterval(countdownInterval);
+      }
     });
   });
 
