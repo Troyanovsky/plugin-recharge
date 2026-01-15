@@ -1,3 +1,18 @@
+/**
+ * background.js - Service Worker for Recharge Chrome Extension
+ *
+ * Responsibilities:
+ * - Manages chrome.alarms for periodic break reminders (blink, water, up, stretch)
+ * - Creates and handles chrome.notifications with optional buttons
+ * - Persists settings via chrome.storage.sync
+ * - Processes water log increment requests with queue-based serialization
+ *
+ * Key Patterns:
+ * - Alarms are recreated with updated intervals on each trigger (not periodic)
+ * - Water notifications use unique IDs with timestamps for button tracking
+ * - Water log counter uses a serialization queue to prevent race conditions
+ */
+
 const NOTIFICATION_MESSAGES = {
   blink: "Time to blink your eyes! Look away from the screen for 20 seconds.",
   water: "Time to drink some water! Stay hydrated!",
@@ -7,6 +22,12 @@ const NOTIFICATION_MESSAGES = {
 };
 
 const DEBUG_MODE = false;  // Set this to false to disable debug logging
+
+// Water log increment queue to prevent race conditions from rapid clicks
+let waterLogQueue = [];
+let isProcessingWaterLogQueue = false;
+const WATER_LOG_MAX_RETRIES = 5;
+const WATER_LOG_RETRY_DELAY_MS = 500;
 
 chrome.runtime.onInstalled.addListener(() => {
   if (DEBUG_MODE) console.log('Extension installed/updated');
@@ -57,36 +78,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 chrome.notifications.onButtonClicked.addListener((notificationId, buttonIndex) => {
   if (notificationId.startsWith('water_')) {
     if (buttonIndex === 0) { // Log Water button clicked
-      // Get current date and water log count
-      chrome.storage.sync.get(['waterLogCount', 'waterLogDate'], (result) => {
-        const today = new Date().toDateString();
-        let waterLogCount = result.waterLogCount || 0;
-        const waterLogDate = result.waterLogDate || '';
-        
-        // Reset counter if it's a new day
-        if (waterLogDate !== today) {
-          waterLogCount = 0;
-        }
-        
-        // Increment water log count
-        waterLogCount++;
-        
-        // Save updated count and date
-        chrome.storage.sync.set({
-          waterLogCount: waterLogCount,
-          waterLogDate: today
-        }, () => {
-          if (DEBUG_MODE) console.log(`Water logged! Count: ${waterLogCount}`);
-          // Notify popup to update the counter display
-          chrome.runtime.sendMessage({ action: 'waterLogged', count: waterLogCount }, () => {
-            // Check for error and ignore it - this happens when popup is not open
-            if (chrome.runtime.lastError) {
-              // Silently handle the error
-              if (DEBUG_MODE) console.log('Popup not open, could not send water logged message');
-            }
-          });
-        });
-      });
+      // Add increment operation to queue for serialized processing
+      waterLogQueue.push({ timestamp: Date.now(), attempts: 0 });
+      processWaterLogQueue();
     }
     // For both buttons, clear the notification
     chrome.notifications.clear(notificationId);
@@ -121,6 +115,101 @@ function createNotification(alarmName, soundEnabled, options = {}) {
   }
   
   return notificationId;
+}
+
+/**
+ * Processes water log increment queue sequentially to prevent race conditions.
+ * Each operation performs an atomic read-modify-write on the water log counter.
+ * Operations are only removed from queue after successful completion.
+ */
+function processWaterLogQueue() {
+  if (isProcessingWaterLogQueue || waterLogQueue.length === 0) {
+    return;
+  }
+
+  isProcessingWaterLogQueue = true;
+
+  // Perform atomic read-modify-write
+  chrome.storage.sync.get(['waterLogCount', 'waterLogDate'], (result) => {
+    const currentOperation = waterLogQueue[0];
+    if (chrome.runtime.lastError) {
+      console.error('Failed to read water log:', chrome.runtime.lastError);
+      if (!handleWaterLogRetry(currentOperation)) {
+        console.error('Dropping water log operation after max retries.');
+        waterLogQueue.shift();
+      }
+      isProcessingWaterLogQueue = false;
+      processWaterLogQueue();
+      return;
+    }
+
+    const today = new Date().toDateString();
+    let waterLogCount = result.waterLogCount || 0;
+    const waterLogDate = result.waterLogDate || '';
+
+    // Reset counter if it's a new day
+    if (waterLogDate !== today) {
+      waterLogCount = 0;
+    }
+
+    // Increment water log count
+    waterLogCount++;
+
+    // Save updated count and date
+    chrome.storage.sync.set({
+      waterLogCount: waterLogCount,
+      waterLogDate: today
+    }, () => {
+      if (chrome.runtime.lastError) {
+        console.error('Failed to save water log:', chrome.runtime.lastError);
+        if (!handleWaterLogRetry(currentOperation)) {
+          console.error('Dropping water log operation after max retries.');
+          waterLogQueue.shift();
+        }
+        isProcessingWaterLogQueue = false;
+        processWaterLogQueue();
+        return;
+      }
+
+      // Only remove from queue after successful write
+      waterLogQueue.shift();
+
+      if (DEBUG_MODE) {
+        console.log(`Water logged! Count: ${waterLogCount}, Queue remaining: ${waterLogQueue.length}`);
+      }
+
+      // Notify popup to update the counter display
+      chrome.runtime.sendMessage({ action: 'waterLogged', count: waterLogCount }, () => {
+        if (chrome.runtime.lastError) {
+          if (DEBUG_MODE) console.log('Popup not open, could not send water logged message');
+        }
+      });
+
+      // Process next operation in queue
+      isProcessingWaterLogQueue = false;
+      processWaterLogQueue();
+    });
+  });
+}
+
+/**
+ * Increments the retry counter and schedules a delayed retry.
+ * Returns true if another retry will be attempted.
+ */
+function handleWaterLogRetry(operation) {
+  if (!operation) {
+    return false;
+  }
+
+  operation.attempts += 1;
+  if (operation.attempts > WATER_LOG_MAX_RETRIES) {
+    return false;
+  }
+
+  setTimeout(() => {
+    processWaterLogQueue();
+  }, WATER_LOG_RETRY_DELAY_MS);
+  return true;
 }
 
 chrome.alarms.onAlarm.addListener((alarm) => {

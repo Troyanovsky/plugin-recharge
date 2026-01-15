@@ -1,0 +1,319 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2025-01-15",
+    "project": "Recharge Chrome Extension",
+    "description": "Issue tracker for bugs, tasks, and improvements"
+  },
+  "issues": [
+    {
+      "id": "BUG-250115-001",
+      "type": "bug",
+      "epic": "Data Integrity",
+      "title": "Race condition in water log counter update",
+      "description": "The water log button click handler uses a non-atomic read-modify-write pattern. If users rapidly click 'Log Water' or have multiple stacked notifications, concurrent reads from storage could result in lost increments. The handler reads waterLogCount, increments it, and writes it back without any locking mechanism.",
+      "acceptance_criteria": [
+        "Water log counter accurately reflects all button clicks even with rapid successive clicks",
+        "Counter increments atomically without race conditions",
+        "Edge case of clicking button before previous write completes is handled"
+      ],
+      "passes": true,
+      "file_references": ["background.js:26-28", "background.js:75-79", "background.js:118-182"],
+      "severity": "critical"
+    },
+    {
+      "id": "BUG-250115-002",
+      "type": "bug",
+      "epic": "Configuration",
+      "title": "Default value inconsistency between popup.js and background.js",
+      "description": "Default interval values are inconsistent between popup.js (blink=20, water=30, up=45, stretch=40) and background.js (blink=10, water=30, up=40, stretch=35). First-time users will see different values in the UI than what's actually stored and used for alarms, causing confusion and incorrect behavior.",
+      "acceptance_criteria": [
+        "Default values are identical across all files",
+        "First-time users see consistent values in UI and actual alarm intervals",
+        "Single source of truth for default values",
+        "Values defined in one place and referenced elsewhere"
+      ],
+      "passes": false,
+      "file_references": ["popup.js:19-22", "background.js:26-32"],
+      "severity": "high"
+    },
+    {
+      "id": "BUG-250115-003",
+      "type": "bug",
+      "epic": "Error Handling",
+      "title": "Missing error handling for one-time timer message",
+      "description": "When creating a one-time timer, chrome.runtime.sendMessage() is called without a callback or error handling in popup.js. If the message fails (e.g., service worker not ready), the user won't know and the timer won't actually start.",
+      "acceptance_criteria": [
+        "Timer creation includes error handling callback",
+        "User is notified if timer creation fails",
+        "Error is logged for debugging purposes",
+        "UI reflects actual timer state"
+      ],
+      "passes": false,
+      "file_references": ["popup.js:73-76"],
+      "severity": "high"
+    },
+    {
+      "id": "BUG-250115-004",
+      "type": "bug",
+      "epic": "Memory Management",
+      "title": "Memory leak - countdown interval not cleared on timer restart",
+      "description": "If the user clicks 'Start' multiple times on the one-time timer without waiting for completion, the previous countdownInterval is not cleared before creating a new one. This causes multiple intervals to run simultaneously, leading to memory leaks and multiple button text updates per second.",
+      "acceptance_criteria": [
+        "Existing interval is cleared before creating new one",
+        "Only one countdown interval runs at a time",
+        "No memory leaks from duplicate intervals",
+        "Button text updates exactly once per second"
+      ],
+      "passes": false,
+      "file_references": ["popup.js:57-77"],
+      "severity": "medium"
+    },
+    {
+      "id": "BUG-250115-005",
+      "type": "bug",
+      "epic": "Notifications",
+      "title": "Potential notification ID collision with Date.now()",
+      "description": "Water notification IDs are generated using Date.now() with millisecond precision. If user has multiple Chrome profiles or rapid successive water alarms, IDs could collide, causing notifications to overwrite each other or behave unexpectedly.",
+      "acceptance_criteria": [
+        "Notification IDs are guaranteed unique",
+        "Multiple simultaneous water notifications handled correctly",
+        "ID generation prevents collisions in all scenarios",
+        "Button clicks map to correct notification instance"
+      ],
+      "passes": false,
+      "file_references": ["background.js:109"],
+      "severity": "medium"
+    },
+    {
+      "id": "BUG-250115-006",
+      "type": "bug",
+      "epic": "Error Handling",
+      "title": "Missing error handling in storage operations",
+      "description": "chrome.storage.sync.set() and get() calls throughout the codebase don't check for errors via chrome.runtime.lastError. Silent failures occur when storage quota is exceeded or sync errors happen. User changes appear to save but don't actually persist.",
+      "acceptance_criteria": [
+        "All storage operations include error checking",
+        "User is notified when storage operations fail",
+        "Errors are logged for debugging",
+        "Graceful handling of quota exceeded scenarios"
+      ],
+      "passes": false,
+      "file_references": ["background.js:39", "popup.js:122-124"],
+      "severity": "medium"
+    },
+    {
+      "id": "BUG-250115-007",
+      "type": "bug",
+      "epic": "Platform Compatibility",
+      "title": "Unsafe macOS detection using navigator.userAgent",
+      "description": "Using navigator.userAgent to detect macOS (/Mac|MacIntel/) is fragile and can be spoofed or changed by browser updates. A more reliable approach would be to use chrome.runtime.getPlatformInfo() API.",
+      "acceptance_criteria": [
+        "macOS detection uses chrome.runtime.getPlatformInfo()",
+        "Platform detection is reliable across browser versions",
+        "Code handles async nature of getPlatformInfo()",
+        "Fallback handling if API unavailable"
+      ],
+      "passes": false,
+      "file_references": ["background.js:133"],
+      "severity": "medium"
+    },
+    {
+      "id": "BUG-250115-008",
+      "type": "bug",
+      "epic": "Input Validation",
+      "title": "Missing input validation for timer and interval values",
+      "description": "No validation that slider values are within expected ranges. If HTML is modified or values corrupted, invalid data could be stored (e.g., negative values, NaN, or values outside the 1-120/0-60 ranges).",
+      "acceptance_criteria": [
+        "All timer values validated before creating alarms",
+        "Interval values validated before saving to storage",
+        "NaN, negative, and out-of-range values rejected",
+        "User feedback on invalid input"
+      ],
+      "passes": false,
+      "file_references": ["popup.js:58", "popup.js:112-119", "background.js:49-51", "background.js:157-159"],
+      "severity": "medium"
+    },
+    {
+      "id": "TASK-250115-001",
+      "type": "task",
+      "epic": "Reliability",
+      "title": "Add error handling to timer completion message",
+      "description": "When notifying popup of timer completion (background.js:152), no error handling exists if popup is closed. This is inconsistent with the waterLogged message handling which does check for errors. Add error handling for consistency.",
+      "acceptance_criteria": [
+        "timerComplete message includes error handling callback",
+        "Silently handles case when popup is not open",
+        "Consistent with waterLogged message pattern",
+        "No console errors from failed message delivery"
+      ],
+      "passes": false,
+      "file_references": ["background.js:152"],
+      "severity": "low"
+    },
+    {
+      "id": "TASK-250115-002",
+      "type": "task",
+      "epic": "Chrome API",
+      "title": "Add sendResponse() calls to message listener",
+      "description": "The message listener in background.js doesn't call sendResponse() or return true for async operations. While currently not causing issues because operations are synchronous, this is fragile and may break with async changes.",
+      "acceptance_criteria": [
+        "Message listener calls sendResponse() appropriately",
+        "Async operations return true to keep message channel open",
+        "Message response pattern follows Chrome API best practices",
+        "Future async operations supported"
+      ],
+      "passes": false,
+      "file_references": ["background.js:44-54"],
+      "severity": "low"
+    },
+    {
+      "id": "TASK-250115-003",
+      "type": "task",
+      "epic": "Code Quality",
+      "title": "Remove duplicate CSS rule for .reminder-header",
+      "description": "The .reminder-header class is defined twice (popup.css:46-52 and 235-241) with identical properties. This is code duplication that creates maintenance burden.",
+      "acceptance_criteria": [
+        "Duplicate .reminder-header definition removed",
+        "All elements using .reminder-header still styled correctly",
+        "No visual changes to the UI",
+        "CSS file reduced by one redundant definition"
+      ],
+      "passes": false,
+      "file_references": ["popup.css:46-52", "popup.css:235-241"],
+      "severity": "low"
+    },
+    {
+      "id": "TASK-250115-004",
+      "type": "task",
+      "epic": "Security",
+      "title": "Add rel=noopener noreferrer to external links",
+      "description": "External links in popup.html use target=_blank without rel=noopener noreferrer. This is a minor security risk where the new window has access to the original window's window object via window.opener.",
+      "acceptance_criteria": [
+        "All external links include rel=noopener noreferrer",
+        "Links still function correctly",
+        "Security vulnerability addressed",
+        "No changes to link behavior"
+      ],
+      "passes": false,
+      "file_references": ["popup.html:104", "popup.html:107"],
+      "severity": "low"
+    },
+    {
+      "id": "CHANGE-250115-001",
+      "type": "change",
+      "epic": "Font Loading",
+      "title": "Add font fallback and display swap for external fonts",
+      "description": "Loading fonts from external CDN without proper fallback. If GitHub/Google is blocked or slow, popup rendering may be delayed. Should add font-display: swap and provide robust font stack.",
+      "acceptance_criteria": [
+        "Font includes font-display: swap directive",
+        "Robust font stack includes system fallbacks",
+        "Text remains readable during font loading",
+        "Graceful degradation when fonts fail to load"
+      ],
+      "passes": false,
+      "file_references": ["popup.html:7", "popup.css:193"],
+      "severity": "low"
+    },
+    {
+      "id": "CHANGE-250115-002",
+      "type": "change",
+      "epic": "Code Quality",
+      "title": "Extract hardcoded magic numbers to constants",
+      "description": "Slider min, max, and value attributes are hardcoded in HTML but also managed in JavaScript. If limits are updated in one place, they must be updated in the other. This is a source of potential bugs.",
+      "acceptance_criteria": [
+        "Constants defined for all slider limits",
+        "HTML references constants or data attributes",
+        "JavaScript uses same constants",
+        "Single source of truth for slider constraints"
+      ],
+      "passes": false,
+      "file_references": ["popup.html:23", "popup.html:40", "popup.html:56", "popup.html:72", "popup.html:85"],
+      "severity": "low"
+    },
+    {
+      "id": "CHANGE-250115-003",
+      "type": "change",
+      "epic": "Code Quality",
+      "title": "Add file-level documentation to all source files",
+      "description": "No JSDoc or file-level comments explaining purpose, responsibilities, or usage patterns exist in any source files. This makes it harder for new contributors to understand the codebase quickly.",
+      "acceptance_criteria": [
+        "Each source file has file-level documentation",
+        "Purpose and responsibilities clearly stated",
+        "Key patterns and usage documented",
+        "Documentation follows JSDoc standards"
+      ],
+      "passes": false,
+      "file_references": ["background.js", "popup.js", "popup.html", "popup.css"],
+      "severity": "low"
+    },
+    {
+      "id": "STORY-250115-001",
+      "type": "story",
+      "epic": "Testing",
+      "title": "Add test coverage for the extension",
+      "description": "The extension currently has no unit tests, integration tests, or E2E tests. This makes refactoring risky and bugs may go undetected. Need to implement comprehensive test coverage using Chrome extension testing frameworks.",
+      "acceptance_criteria": [
+        "Unit tests for utility functions",
+        "Integration tests for message passing",
+        "Tests for alarm creation and management",
+        "Tests for notification handling",
+        "E2E tests for critical user flows",
+        "Test coverage reporting implemented",
+        "CI/CD integration for automated testing"
+      ],
+      "passes": false,
+      "file_references": [],
+      "severity": "medium"
+    },
+    {
+      "id": "STORY-250115-002",
+      "type": "story",
+      "epic": "Data Integrity",
+      "title": "Implement centralized state management",
+      "description": "State is managed through chrome.storage.sync with direct reads/writes scattered throughout the codebase. As the codebase grows, state synchronization becomes harder. Consider implementing a centralized state management pattern or at least centralizing storage operations in utility functions.",
+      "acceptance_criteria": [
+        "Storage operations centralized in utility module",
+        "Consistent error handling across all storage operations",
+        "State changes tracked and auditable",
+        "Easier to add new storage keys",
+        "Reduced code duplication"
+      ],
+      "passes": false,
+      "file_references": [],
+      "severity": "low"
+    },
+    {
+      "id": "STORY-250115-003",
+      "type": "story",
+      "epic": "Documentation",
+      "title": "Document macOS notification workaround",
+      "description": "The extension sets requireInteraction: false on macOS as a workaround for notification behavior. This platform-specific hack may break with Chrome updates and should be clearly documented with context and monitoring recommendations.",
+      "acceptance_criteria": [
+        "macOS workaround documented in code comments",
+        "Explanation of why workaround is needed",
+        "Link to relevant Chrome bugs if applicable",
+        "Monitoring recommendations for Chrome updates",
+        "Consider filing Chrome bug if appropriate"
+      ],
+      "passes": false,
+      "file_references": ["background.js:142"],
+      "severity": "low"
+    },
+    {
+      "id": "STORY-250115-004",
+      "type": "story",
+      "epic": "Data Integrity",
+      "title": "Address sync conflict resolution for water log counter",
+      "description": "If user has multiple Chrome devices with the extension signed in to sync, the water log counter could have conflicts (one device increments while another is offline). Need to decide on approach: device-specific counts, cloud aggregation, or document per-device behavior.",
+      "acceptance_criteria": [
+        "Decision made on multi-device water logging strategy",
+        "Either: implement device-specific counting with aggregation",
+        "Or: document that water logging is per-device",
+        "User experience clarified in UI if multi-device",
+        "Edge cases handled (offline changes, sync delays)"
+      ],
+      "passes": false,
+      "file_references": ["background.js:34"],
+      "severity": "low"
+    }
+  ]
+}
