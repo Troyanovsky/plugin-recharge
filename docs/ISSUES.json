@@ -149,6 +149,20 @@
       "passes": false,
       "file_references": ["background.js"],
       "severity": "low"
+    },
+    {
+      "id": "STORY-250116-001",
+      "type": "story",
+      "epic": "Deployment",
+      "title": "Add a script to package into a zip with correct structure for Chrome Web Store",
+      "description": "Currently, packaging the extension for Chrome Web Store is a manual process. and may include unnecessary files like docs, tests. Create a build script to automate packaging into a zip with only required files.",
+      "acceptance_criteria": [
+        "Build script created (e.g., build.js or build.sh)",
+        "Script packages only necessary files",
+        "Output is a zip file ready for Chrome Web Store upload",
+        "Script documented in AGENTS.md"
+      ],
+      "passes": false
     }
   ]
 }
