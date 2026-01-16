@@ -193,8 +193,8 @@
         "Text remains readable during font loading",
         "Graceful degradation when fonts fail to load"
       ],
-      "passes": false,
-      "file_references": ["popup.html:7", "popup.css:193"],
+      "passes": true,
+      "file_references": ["popup.html:7", "popup.css:17"],
       "severity": "low"
     },
     {
