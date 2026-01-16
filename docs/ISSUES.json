@@ -1,25 +1,6 @@
 {
   "issues": [
     {
-      "id": "STORY-250115-001",
-      "type": "story",
-      "epic": "Testing",
-      "title": "Add test coverage for the extension",
-      "description": "The extension currently has no unit tests, integration tests, or E2E tests. This makes refactoring risky and bugs may go undetected. Need to implement comprehensive test coverage using Chrome extension testing frameworks.",
-      "acceptance_criteria": [
-        "Unit tests for utility functions",
-        "Integration tests for message passing",
-        "Tests for alarm creation and management",
-        "Tests for notification handling",
-        "E2E tests for critical user flows",
-        "Test coverage reporting implemented",
-        "CI/CD integration for automated testing"
-      ],
-      "passes": false,
-      "file_references": [],
-      "severity": "medium"
-    },
-    {
       "id": "STORY-250115-002",
       "type": "story",
       "epic": "Data Integrity",
@@ -48,23 +29,6 @@
         "Link to relevant Chrome bugs if applicable",
         "Monitoring recommendations for Chrome updates",
         "Consider filing Chrome bug if appropriate"
-      ],
-      "passes": false,
-      "file_references": ["background.js"],
-      "severity": "low"
-    },
-    {
-      "id": "STORY-250115-004",
-      "type": "story",
-      "epic": "Data Integrity",
-      "title": "Address sync conflict resolution for water log counter",
-      "description": "If user has multiple Chrome devices with the extension signed in to sync, the water log counter could have conflicts (one device increments while another is offline). Need to decide on approach: device-specific counts, cloud aggregation, or document per-device behavior.",
-      "acceptance_criteria": [
-        "Decision made on multi-device water logging strategy",
-        "Either: implement device-specific counting with aggregation",
-        "Or: document that water logging is per-device",
-        "User experience clarified in UI if multi-device",
-        "Edge cases handled (offline changes, sync delays)"
       ],
       "passes": false,
       "file_references": ["background.js"],
