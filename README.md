@@ -50,6 +50,7 @@ Created by [Troy](https://github.com/Troyanovsky)
 
 ## Changelog
 
+- V1.3 2025-01-16 - Bug fixes and code quality improvements: race condition fixes, error handling, input validation, timer state persistence, automated test coverage
 - V1.2 2025-05-17 - Added water logging counter
 - V1.1 2024-11-25 - Added one-time countdown timer feature
 - V1.0 2024-11-03 - Initial release. Supports Blink, Water, Movement, and Stretch reminders.
