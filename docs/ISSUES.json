@@ -16,23 +16,6 @@
       "passes": false,
       "file_references": [],
       "severity": "low"
-    },
-    {
-      "id": "STORY-250115-003",
-      "type": "story",
-      "epic": "Documentation",
-      "title": "Document macOS notification workaround",
-      "description": "The extension sets requireInteraction: false on macOS as a workaround for notification behavior. This platform-specific hack may break with Chrome updates and should be clearly documented with context and monitoring recommendations.",
-      "acceptance_criteria": [
-        "macOS workaround documented in code comments",
-        "Explanation of why workaround is needed",
-        "Link to relevant Chrome bugs if applicable",
-        "Monitoring recommendations for Chrome updates",
-        "Consider filing Chrome bug if appropriate"
-      ],
-      "passes": false,
-      "file_references": ["background.js"],
-      "severity": "low"
     }
   ]
 }

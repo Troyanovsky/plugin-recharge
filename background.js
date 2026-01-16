@@ -7,6 +7,10 @@
  * - Alarms recreate on each trigger with updated intervals (not periodic)
  * - Water notifications use unique timestamp IDs for button tracking
  * - Water log counter uses serialization queue to prevent race conditions
+ *
+ * Platform-specific workarounds:
+ * - macOS notification button handling: See chrome.alarms.onAlarm listener
+ *   (search for "macOS NOTIFICATION WORKAROUND" for details)
  */
 
 const NOTIFICATION_MESSAGES = {
@@ -564,12 +568,23 @@ function handleWaterLogRetry(operation) {
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (DEBUG_MODE) console.log(`Alarm triggered: ${alarm.name}`);
-  
+
   chrome.storage.sync.get(['soundEnabled'], (result) => {
     const soundEnabled = result.soundEnabled ?? DEFAULT_SOUND_ENABLED;
     playNotificationSoundIfNeeded(alarm.name, soundEnabled);
     if (alarm.name === 'water') {
-      // Create notification with buttons for water alarm
+      /*
+       * macOS NOTIFICATION WORKAROUND
+       *
+       * Issue: macOS doesn't handle persistent notifications with buttons reliably.
+       * Buttons may not display or click events may be lost when requireInteraction=true.
+       *
+       * Workaround: Set requireInteraction=false on macOS only.
+       * Trade-off: notifications may auto-dismiss before user sees them.
+       *
+       * Risk: Chrome updates may break this; test on macOS after each Chrome update.
+       * File bugs at: https://bugs.chromium.org
+       */
       getIsMacOS((isMacOS) => {
         if (DEBUG_MODE) console.log(`Platform detected: ${isMacOS ? 'macOS' : 'other'}, setting requireInteraction to ${!isMacOS}`);
 
@@ -579,8 +594,8 @@ chrome.alarms.onAlarm.addListener((alarm) => {
             { title: 'Log Water' },
             { title: 'Skip' }
           ],
-          requireInteraction: !isMacOS, // Set to false on macOS, true on other platforms
-          isWater: true // This is a custom property that will be extracted before creating the notification
+          requireInteraction: !isMacOS, // false on macOS due to platform limitation, true elsewhere
+          isWater: true // Custom property extracted before Chrome API call
         });
       });
     } else {
