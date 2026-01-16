@@ -46,7 +46,7 @@ function initializeSliderConstraints() {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+function initializePopup() {
   // Initialize slider constraints from constants before loading settings
   initializeSliderConstraints();
 
@@ -162,7 +162,15 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('unload', () => {
     clearInterval(countdownInterval);
   });
-});
+}
+
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializePopup);
+  } else {
+    initializePopup();
+  }
+}
 
 function updateDisplayValues() {
   document.getElementById('blinkValue').textContent = document.getElementById('blinkInterval').value;
@@ -227,3 +235,12 @@ function updateButtonCountdown(endTime) {
   const formattedTime = `${minutes}:${seconds.toString().padStart(2, '0')}`;
   document.getElementById('startTimerBtn').textContent = formattedTime;
 }
+
+export {
+  initializePopup,
+  initializeSliderConstraints,
+  updateDisplayValues,
+  updateWaterLogBadge,
+  isValidInterval,
+  updateButtonCountdown
+};

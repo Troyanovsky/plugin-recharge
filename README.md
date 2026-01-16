@@ -35,6 +35,12 @@ A Chrome extension that helps you maintain healthy habits while working at your 
    - Enable "Developer mode"
    - Click "Load unpacked" and select the extension directory
 
+## Testing
+
+- Install dependencies: `npm install`
+- Unit + integration tests with coverage: `npm test`
+- E2E tests (loads the extension in Playwright): `npm run test:e2e`
+
 ## Support
 
 - Report issues on [GitHub](https://github.com/Troyanovsky/plugin-recharge)

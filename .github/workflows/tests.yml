@@ -1,0 +1,26 @@
+# tests.yml - CI workflow for unit/integration/e2e test coverage.
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+      - name: Run unit and integration tests with coverage
+        run: npm test
+      - name: Run E2E tests
+        run: npm run test:e2e

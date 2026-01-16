@@ -368,3 +368,15 @@ function updateAlarms(settings) {
     });
   });
 }
+
+// Expose selected helpers for unit tests without affecting extension runtime.
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    isValidAlarmInterval,
+    isValidRepeatingInterval,
+    updateAlarms,
+    createNotification,
+    processWaterLogQueue,
+    handleWaterLogRetry
+  };
+}
