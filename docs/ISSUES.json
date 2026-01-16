@@ -209,8 +209,8 @@
         "JavaScript uses same constants",
         "Single source of truth for slider constraints"
       ],
-      "passes": false,
-      "file_references": ["popup.html:23", "popup.html:40", "popup.html:56", "popup.html:72", "popup.html:85"],
+      "passes": true,
+      "file_references": ["constants.js", "popup.js:1-36,40-44", "background.js:32-79"],
       "severity": "low"
     },
     {

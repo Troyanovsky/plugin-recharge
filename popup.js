@@ -1,10 +1,44 @@
-// Validation constants for timer and interval values
-const ONE_TIME_MIN = 1;
-const ONE_TIME_MAX = 120;
-const REPEATING_INTERVAL_MIN = 0;
-const REPEATING_INTERVAL_MAX = 60;
+// Import shared constants
+import {
+  ONE_TIME_MIN,
+  ONE_TIME_MAX,
+  REPEATING_INTERVAL_MIN,
+  REPEATING_INTERVAL_MAX,
+  DEFAULT_BLINK_INTERVAL,
+  DEFAULT_WATER_INTERVAL,
+  DEFAULT_UP_INTERVAL,
+  DEFAULT_STRETCH_INTERVAL,
+  DEFAULT_SOUND_ENABLED,
+  DEFAULT_BLINK_ENABLED,
+  DEFAULT_WATER_ENABLED,
+  DEFAULT_UP_ENABLED,
+  DEFAULT_STRETCH_ENABLED
+} from './constants.js';
+
+// Initialize slider min/max attributes from constants
+function initializeSliderConstraints() {
+  // Repeating interval sliders (blink, water, up, stretch)
+  const repeatingSliderIds = ['blinkInterval', 'waterInterval', 'upInterval', 'stretchInterval'];
+  repeatingSliderIds.forEach(id => {
+    const element = document.getElementById(id);
+    if (element) {
+      element.min = REPEATING_INTERVAL_MIN;
+      element.max = REPEATING_INTERVAL_MAX;
+    }
+  });
+
+  // One-time timer slider
+  const oneTimeSlider = document.getElementById('oneTimeInterval');
+  if (oneTimeSlider) {
+    oneTimeSlider.min = ONE_TIME_MIN;
+    oneTimeSlider.max = ONE_TIME_MAX;
+  }
+}
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Initialize slider constraints from constants before loading settings
+  initializeSliderConstraints();
+
   // Load saved settings
   chrome.storage.sync.get([
     'blinkEnabled', 'blinkInterval',
@@ -20,17 +54,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Set toggle states
-    document.getElementById('blinkToggle').checked = result.blinkEnabled ?? false;
-    document.getElementById('waterToggle').checked = result.waterEnabled ?? false;
-    document.getElementById('upToggle').checked = result.upEnabled ?? false;
-    document.getElementById('stretchToggle').checked = result.stretchEnabled ?? false;
-    document.getElementById('soundToggle').checked = result.soundEnabled ?? true;
+    document.getElementById('blinkToggle').checked = result.blinkEnabled ?? DEFAULT_BLINK_ENABLED;
+    document.getElementById('waterToggle').checked = result.waterEnabled ?? DEFAULT_WATER_ENABLED;
+    document.getElementById('upToggle').checked = result.upEnabled ?? DEFAULT_UP_ENABLED;
+    document.getElementById('stretchToggle').checked = result.stretchEnabled ?? DEFAULT_STRETCH_ENABLED;
+    document.getElementById('soundToggle').checked = result.soundEnabled ?? DEFAULT_SOUND_ENABLED;
 
     // Set slider values
-    document.getElementById('blinkInterval').value = result.blinkInterval ?? 20;
-    document.getElementById('waterInterval').value = result.waterInterval ?? 30;
-    document.getElementById('upInterval').value = result.upInterval ?? 45;
-    document.getElementById('stretchInterval').value = result.stretchInterval ?? 40;
+    document.getElementById('blinkInterval').value = result.blinkInterval ?? DEFAULT_BLINK_INTERVAL;
+    document.getElementById('waterInterval').value = result.waterInterval ?? DEFAULT_WATER_INTERVAL;
+    document.getElementById('upInterval').value = result.upInterval ?? DEFAULT_UP_INTERVAL;
+    document.getElementById('stretchInterval').value = result.stretchInterval ?? DEFAULT_STRETCH_INTERVAL;
 
     // Update display values
     updateDisplayValues();

@@ -30,10 +30,25 @@ const WATER_LOG_MAX_RETRIES = 5;
 const WATER_LOG_RETRY_DELAY_MS = 500;
 
 // Validation constants for timer and interval values
+// NOTE: These are duplicated from constants.js because service workers
+// don't support ES6 module imports. When updating, keep both files in sync.
 const ONE_TIME_MIN = 1;
 const ONE_TIME_MAX = 120;
 const REPEATING_INTERVAL_MIN = 0;
 const REPEATING_INTERVAL_MAX = 60;
+
+// Default values for interval sliders (in minutes)
+const DEFAULT_BLINK_INTERVAL = 20;
+const DEFAULT_WATER_INTERVAL = 30;
+const DEFAULT_UP_INTERVAL = 45;
+const DEFAULT_STRETCH_INTERVAL = 40;
+
+// Default values for feature toggles
+const DEFAULT_SOUND_ENABLED = true;
+const DEFAULT_BLINK_ENABLED = false;
+const DEFAULT_WATER_ENABLED = false;
+const DEFAULT_UP_ENABLED = false;
+const DEFAULT_STRETCH_ENABLED = false;
 
 chrome.runtime.onInstalled.addListener(() => {
   if (DEBUG_MODE) console.log('Extension installed/updated');
@@ -54,15 +69,15 @@ chrome.runtime.onInstalled.addListener(() => {
 
     const today = new Date().toDateString();
     const defaultSettings = {
-      blinkEnabled: result.blinkEnabled ?? false,
-      blinkInterval: result.blinkInterval ?? 20,
-      waterEnabled: result.waterEnabled ?? false,
-      waterInterval: result.waterInterval ?? 30,
-      upEnabled: result.upEnabled ?? false,
-      upInterval: result.upInterval ?? 45,
-      stretchEnabled: result.stretchEnabled ?? false,
-      stretchInterval: result.stretchInterval ?? 40,
-      soundEnabled: result.soundEnabled ?? true,
+      blinkEnabled: result.blinkEnabled ?? DEFAULT_BLINK_ENABLED,
+      blinkInterval: result.blinkInterval ?? DEFAULT_BLINK_INTERVAL,
+      waterEnabled: result.waterEnabled ?? DEFAULT_WATER_ENABLED,
+      waterInterval: result.waterInterval ?? DEFAULT_WATER_INTERVAL,
+      upEnabled: result.upEnabled ?? DEFAULT_UP_ENABLED,
+      upInterval: result.upInterval ?? DEFAULT_UP_INTERVAL,
+      stretchEnabled: result.stretchEnabled ?? DEFAULT_STRETCH_ENABLED,
+      stretchInterval: result.stretchInterval ?? DEFAULT_STRETCH_INTERVAL,
+      soundEnabled: result.soundEnabled ?? DEFAULT_SOUND_ENABLED,
       waterLogCount: (result.waterLogDate === today) ? result.waterLogCount : 0,
       waterLogDate: today
     };
