@@ -1,16 +1,12 @@
 /**
  * background.js - Service Worker for Recharge Chrome Extension
  *
- * Responsibilities:
- * - Manages chrome.alarms for periodic break reminders (blink, water, up, stretch)
- * - Creates and handles chrome.notifications with optional buttons
- * - Persists settings via chrome.storage.sync
- * - Processes water log increment requests with queue-based serialization
+ * Manages alarms, notifications, and storage for break reminders.
  *
- * Key Patterns:
- * - Alarms are recreated with updated intervals on each trigger (not periodic)
- * - Water notifications use unique IDs with timestamps for button tracking
- * - Water log counter uses a serialization queue to prevent race conditions
+ * Key patterns:
+ * - Alarms recreate on each trigger with updated intervals (not periodic)
+ * - Water notifications use unique timestamp IDs for button tracking
+ * - Water log counter uses serialization queue to prevent race conditions
  */
 
 const NOTIFICATION_MESSAGES = {

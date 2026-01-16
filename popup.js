@@ -1,3 +1,14 @@
+/**
+ * popup.js - Popup UI for Recharge Chrome Extension
+ *
+ * Renders settings interface, persists to chrome.storage.sync, and handles
+ * real-time updates for water log counter and one-time timer countdown.
+ *
+ * Key patterns:
+ * - Settings save immediately on any input change
+ * - Receives 'timerComplete' and 'waterLogged' messages from background
+ */
+
 // Import shared constants
 import {
   ONE_TIME_MIN,

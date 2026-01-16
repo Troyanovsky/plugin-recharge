@@ -1,3 +1,10 @@
+/**
+ * popup.css - Styles for Recharge Chrome Extension Popup
+ *
+ * Modern card-based layout with iOS-style toggles and custom range sliders.
+ * Uses CSS custom properties for consistent theming.
+ */
+
 :root {
   --primary-color: #2563eb;
   --background-color: #ffffff;
