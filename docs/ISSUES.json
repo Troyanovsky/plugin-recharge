@@ -7,85 +7,6 @@
   },
   "issues": [
     {
-      "id": "BUG-250115-001",
-      "type": "bug",
-      "epic": "Data Integrity",
-      "title": "Race condition in water log counter update",
-      "description": "The water log button click handler uses a non-atomic read-modify-write pattern. If users rapidly click 'Log Water' or have multiple stacked notifications, concurrent reads from storage could result in lost increments. The handler reads waterLogCount, increments it, and writes it back without any locking mechanism.",
-      "acceptance_criteria": [
-        "Water log counter accurately reflects all button clicks even with rapid successive clicks",
-        "Counter increments atomically without race conditions",
-        "Edge case of clicking button before previous write completes is handled"
-      ],
-      "passes": true,
-      "file_references": ["background.js:26-28", "background.js:75-79", "background.js:118-182"],
-      "severity": "critical"
-    },
-    {
-      "id": "BUG-250115-002",
-      "type": "bug",
-      "epic": "Configuration",
-      "title": "Default value inconsistency between popup.js and background.js",
-      "description": "Default interval values are inconsistent between popup.js (blink=20, water=30, up=45, stretch=40) and background.js (blink=10, water=30, up=40, stretch=35). First-time users will see different values in the UI than what's actually stored and used for alarms, causing confusion and incorrect behavior.",
-      "acceptance_criteria": [
-        "Default values are identical across all files (use popup.js values)",
-        "First-time users see consistent values in UI and actual alarm intervals",
-        "Single source of truth for default values",
-        "Values defined in one place and referenced elsewhere"
-      ],
-      "passes": true,
-      "file_references": ["popup.js:19-22", "background.js:47,49,51,53"],
-      "severity": "high"
-    },
-    {
-      "id": "BUG-250115-003",
-      "type": "bug",
-      "epic": "Error Handling",
-      "title": "Missing error handling for one-time timer message",
-      "description": "When creating a one-time timer, chrome.runtime.sendMessage() is called without a callback or error handling in popup.js. If the message fails (e.g., service worker not ready), the user won't know and the timer won't actually start.",
-      "acceptance_criteria": [
-        "Timer creation includes error handling callback",
-        "User is notified if timer creation fails",
-        "Error is logged for debugging purposes",
-        "UI reflects actual timer state"
-      ],
-      "passes": true,
-      "file_references": ["popup.js:73-84"],
-      "severity": "high"
-    },
-    {
-      "id": "BUG-250115-004",
-      "type": "bug",
-      "epic": "Memory Management",
-      "title": "Memory leak - countdown interval not cleared on timer restart",
-      "description": "If the user clicks 'Start' multiple times on the one-time timer without waiting for completion, the previous countdownInterval is not cleared before creating a new one. This causes multiple intervals to run simultaneously, leading to memory leaks and multiple button text updates per second.",
-      "acceptance_criteria": [
-        "Existing interval is cleared before creating new one",
-        "Only one countdown interval runs at a time",
-        "No memory leaks from duplicate intervals",
-        "Button text updates exactly once per second"
-      ],
-      "passes": true,
-      "file_references": ["popup.js:57-77"],
-      "severity": "medium"
-    },
-    {
-      "id": "BUG-250115-006",
-      "type": "bug",
-      "epic": "Error Handling",
-      "title": "Missing error handling in storage operations",
-      "description": "chrome.storage.sync.set() and get() calls throughout the codebase don't check for errors via chrome.runtime.lastError. Silent failures occur when storage quota is exceeded or sync errors happen. User changes appear to save but don't actually persist.",
-      "acceptance_criteria": [
-        "All storage operations include error checking",
-        "User is notified when storage operations fail",
-        "Errors are logged for debugging",
-        "Graceful handling of quota exceeded scenarios"
-      ],
-      "passes": true,
-      "file_references": ["background.js:36-72", "popup.js:120-140"],
-      "severity": "medium"
-    },
-    {
       "id": "BUG-250115-007",
       "type": "bug",
       "epic": "Platform Compatibility",
@@ -98,23 +19,7 @@
         "Fallback handling if API unavailable"
       ],
       "passes": false,
-      "file_references": ["background.js:133"],
-      "severity": "medium"
-    },
-    {
-      "id": "BUG-250115-008",
-      "type": "bug",
-      "epic": "Input Validation",
-      "title": "Missing input validation for timer and interval values",
-      "description": "No validation that slider values are within expected ranges. If HTML is modified or values corrupted, invalid data could be stored (e.g., negative values, NaN, or values outside the 1-120/0-60 ranges).",
-      "acceptance_criteria": [
-        "All timer values validated before creating alarms",
-        "Interval values validated before saving to storage",
-        "NaN, negative, and out-of-range values rejected",
-        "User feedback on invalid input"
-      ],
-      "passes": true,
-      "file_references": ["popup.js:66-68", "popup.js:141-145", "popup.js:168-170", "background.js:81-88", "background.js:97-108", "background.js:310-313", "background.js:279-286"],
+      "file_references": ["background.js"],
       "severity": "medium"
     },
     {
@@ -122,7 +27,7 @@
       "type": "task",
       "epic": "Reliability",
       "title": "Add error handling to timer completion message",
-      "description": "When notifying popup of timer completion (background.js:152), no error handling exists if popup is closed. This is inconsistent with the waterLogged message handling which does check for errors. Add error handling for consistency.",
+      "description": "When notifying popup of timer completion, no error handling exists if popup is closed. This is inconsistent with the waterLogged message handling which does check for errors. Add error handling for consistency.",
       "acceptance_criteria": [
         "timerComplete message includes error handling callback",
         "Silently handles case when popup is not open",
@@ -130,7 +35,7 @@
         "No console errors from failed message delivery"
       ],
       "passes": false,
-      "file_references": ["background.js:152"],
+      "file_references": ["background.js"],
       "severity": "low"
     },
     {
@@ -146,23 +51,7 @@
         "Future async operations supported"
       ],
       "passes": false,
-      "file_references": ["background.js:44-54"],
-      "severity": "low"
-    },
-    {
-      "id": "TASK-250115-003",
-      "type": "task",
-      "epic": "Code Quality",
-      "title": "Remove duplicate CSS rule for .reminder-header",
-      "description": "The .reminder-header class is defined twice (popup.css:46-52 and 235-241) with identical properties. This is code duplication that creates maintenance burden.",
-      "acceptance_criteria": [
-        "Duplicate .reminder-header definition removed",
-        "All elements using .reminder-header still styled correctly",
-        "No visual changes to the UI",
-        "CSS file reduced by one redundant definition"
-      ],
-      "passes": true,
-      "file_references": ["popup.css:46-52"],
+      "file_references": ["background.js"],
       "severity": "low"
     },
     {
@@ -178,39 +67,7 @@
         "No changes to link behavior"
       ],
       "passes": false,
-      "file_references": ["popup.html:104", "popup.html:107"],
-      "severity": "low"
-    },
-    {
-      "id": "CHANGE-250115-001",
-      "type": "change",
-      "epic": "Font Loading",
-      "title": "Add font fallback and display swap for external fonts",
-      "description": "Loading fonts from external CDN without proper fallback. If GitHub/Google is blocked or slow, popup rendering may be delayed. Should add font-display: swap and provide robust font stack.",
-      "acceptance_criteria": [
-        "Font includes font-display: swap directive",
-        "Robust font stack includes system fallbacks",
-        "Text remains readable during font loading",
-        "Graceful degradation when fonts fail to load"
-      ],
-      "passes": true,
-      "file_references": ["popup.html:7", "popup.css:17"],
-      "severity": "low"
-    },
-    {
-      "id": "CHANGE-250115-002",
-      "type": "change",
-      "epic": "Code Quality",
-      "title": "Extract hardcoded magic numbers to constants",
-      "description": "Slider min, max, and value attributes are hardcoded in HTML but also managed in JavaScript. If limits are updated in one place, they must be updated in the other. This is a source of potential bugs.",
-      "acceptance_criteria": [
-        "Constants defined for all slider limits",
-        "HTML references constants or data attributes",
-        "JavaScript uses same constants",
-        "Single source of truth for slider constraints"
-      ],
-      "passes": true,
-      "file_references": ["constants.js", "popup.js:1-36,40-44", "background.js:32-79"],
+      "file_references": ["popup.html"],
       "severity": "low"
     },
     {
@@ -279,7 +136,7 @@
         "Consider filing Chrome bug if appropriate"
       ],
       "passes": false,
-      "file_references": ["background.js:142"],
+      "file_references": ["background.js"],
       "severity": "low"
     },
     {
@@ -296,7 +153,7 @@
         "Edge cases handled (offline changes, sync delays)"
       ],
       "passes": false,
-      "file_references": ["background.js:34"],
+      "file_references": ["background.js"],
       "severity": "low"
     }
   ]
