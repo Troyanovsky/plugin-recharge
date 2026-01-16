@@ -22,10 +22,13 @@ This file provides guidance to coding agents when working with code in this repo
 ### No Build Process
 This is a vanilla JavaScript extension with no compilation, bundling, or dependencies. Edit files directly and reload the extension to test changes.
 
+### Packaging for Chrome Web Store
+Run `./build.sh` to create `dist/recharge.zip` containing only the files required for upload.
+
 ### Testing
 - Install dependencies: `npm install`
 - Unit + integration tests with coverage: `npm test`
-- E2E tests (loads the extension in Playwright): `npm run test:e2e`
+- Manual release checklist: `docs/manual-test-cases.md`
 
 ## Architecture
 

@@ -17,13 +17,107 @@ const NOTIFICATION_MESSAGES = {
   oneTime: "Your timer is up!"
 };
 
-const DEBUG_MODE = false;  // Set this to false to disable debug logging
+const DEBUG_MODE = false;  // Temporarily set true when diagnosing issues
 
 // Water log increment queue to prevent race conditions from rapid clicks
 let waterLogQueue = [];
 let isProcessingWaterLogQueue = false;
 const WATER_LOG_MAX_RETRIES = 5;
 const WATER_LOG_RETRY_DELAY_MS = 500;
+
+// Stores the last applied alarm settings in chrome.storage.local so updateAlarms
+// can avoid rescheduling unrelated alarms (e.g., when only sound settings change).
+const ALARM_STATE_STORAGE_KEY = 'alarmStateV1';
+
+// One-time timer UI state persisted to chrome.storage.local to allow popup restore.
+const ONE_TIME_STATE_STORAGE_KEY = 'oneTimeStateV1';
+
+// Audio playback on platforms where notification sounds are unreliable.
+const SOUND_SUPPORT_STORAGE_KEY = 'soundPlaybackSupportedV1';
+const OFFSCREEN_DOCUMENT_URL = 'offscreen.html';
+let isOffscreenDocumentReady = false;
+let isOffscreenListenerReady = false;
+let offscreenReadyWaiters = [];
+
+// Cached platform check to avoid repeated getPlatformInfo calls.
+let cachedIsMacOS = null;
+
+/**
+ * Calls a Chrome API that may be callback- or promise-based and returns a Promise.
+ * @template T
+ * @param {(cb: (result: T) => void) => (Promise<T> | void)} fn
+ * @returns {Promise<T>}
+ */
+function callChromeApi(fn) {
+  return new Promise((resolve, reject) => {
+    try {
+      const maybePromise = fn((result) => {
+        if (chrome.runtime.lastError) {
+          reject(chrome.runtime.lastError);
+          return;
+        }
+        resolve(result);
+      });
+
+      if (maybePromise && typeof maybePromise.then === 'function') {
+        maybePromise.then(resolve, reject);
+      }
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+/**
+ * Checks whether an offscreen document currently exists.
+ * @returns {Promise<boolean>}
+ */
+async function hasOffscreenDocument() {
+  if (!chrome.offscreen?.hasDocument) {
+    return false;
+  }
+
+  try {
+    return await callChromeApi((cb) => chrome.offscreen.hasDocument(cb));
+  } catch (error) {
+    // Some Chrome builds expose promise-only APIs; fall back to calling without a callback.
+    try {
+      const maybePromise = chrome.offscreen.hasDocument();
+      if (maybePromise && typeof maybePromise.then === 'function') {
+        return await maybePromise;
+      }
+    } catch {
+      // Ignore and report below.
+    }
+    if (DEBUG_MODE) console.error('Failed to query offscreen document state:', error);
+    return false;
+  }
+}
+
+/**
+ * Creates the offscreen document for audio playback.
+ * @returns {Promise<void>}
+ */
+async function createOffscreenDocument() {
+  const options = {
+    url: OFFSCREEN_DOCUMENT_URL,
+    reasons: chrome.offscreen?.Reason?.AUDIO_PLAYBACK
+      ? [chrome.offscreen.Reason.AUDIO_PLAYBACK]
+      : ['AUDIO_PLAYBACK'],
+    justification: 'Play a short notification sound when required.'
+  };
+  try {
+    await callChromeApi((cb) => chrome.offscreen.createDocument(options, cb));
+  } catch (error) {
+    // Some Chrome builds expose promise-only APIs; fall back to calling without a callback.
+    const maybePromise = chrome.offscreen.createDocument(options);
+    if (maybePromise && typeof maybePromise.then === 'function') {
+      await maybePromise;
+      return;
+    }
+    throw error;
+  }
+}
 
 // Validation constants for timer and interval values
 // NOTE: These are duplicated from constants.js because service workers
@@ -90,21 +184,215 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.action === 'offscreenReady') {
+    isOffscreenListenerReady = true;
+    offscreenReadyWaiters.forEach((resolve) => resolve(true));
+    offscreenReadyWaiters = [];
+    sendResponse?.({ ok: true });
+    return;
+  }
   if (message.action === 'updateAlarms') {
     updateAlarms(message.settings);
+    sendResponse?.({ ok: true });
   }
   if (message.action === 'createOneTimeTimer') {
     const minutes = message.minutes;
     if (isValidAlarmInterval(minutes)) {
+      const durationMinutes = Number(minutes);
+      const scheduledTime = Date.now() + durationMinutes * 60 * 1000;
       chrome.alarms.create('oneTime', {
         delayInMinutes: minutes
       });
+      chrome.storage.local.set({
+        [ONE_TIME_STATE_STORAGE_KEY]: { scheduledTime, durationMinutes }
+      }, () => {
+        if (chrome.runtime.lastError) {
+          console.error('Failed to persist one-time timer state:', chrome.runtime.lastError);
+        }
+      });
       if (DEBUG_MODE) console.log(`Created one-time timer for ${minutes} minutes`);
+      sendResponse?.({ ok: true });
     } else {
       console.error(`Invalid one-time timer value: ${minutes}. Must be between ${ONE_TIME_MIN} and ${ONE_TIME_MAX} minutes.`);
+      sendResponse?.({ ok: false, error: 'invalid_timer_value' });
     }
   }
+  if (message.action === 'cancelOneTimeTimer') {
+    chrome.alarms.clear('oneTime', () => {
+      chrome.storage.local.remove([ONE_TIME_STATE_STORAGE_KEY], () => {
+        if (chrome.runtime.lastError) {
+          console.error('Failed to clear one-time timer state:', chrome.runtime.lastError);
+        }
+        sendResponse?.({ ok: true });
+      });
+    });
+    return true;
+  }
 });
+
+/**
+ * Waits for the offscreen document to register its message listener.
+ * Only used when we observe a delivery failure, to avoid slowing normal paths.
+ * @param {number} timeoutMs
+ * @returns {Promise<boolean>}
+ */
+function waitForOffscreenListenerReady(timeoutMs = 500) {
+  if (isOffscreenListenerReady) {
+    return Promise.resolve(true);
+  }
+  return new Promise((resolve) => {
+    offscreenReadyWaiters.push(resolve);
+    setTimeout(() => {
+      const index = offscreenReadyWaiters.indexOf(resolve);
+      if (index !== -1) {
+        offscreenReadyWaiters.splice(index, 1);
+      }
+      resolve(false);
+    }, timeoutMs);
+  });
+}
+
+/**
+ * Ensures the offscreen document is available for audio playback.
+ * @returns {Promise<boolean>}
+ */
+async function ensureOffscreenDocument() {
+  if (!chrome.offscreen?.createDocument) {
+    return false;
+  }
+
+  if (await hasOffscreenDocument()) {
+    isOffscreenDocumentReady = true;
+    return true;
+  }
+
+  if (isOffscreenDocumentReady && !chrome.offscreen?.hasDocument) {
+    // Best-effort fallback for older Chrome builds.
+    return true;
+  }
+
+  try {
+    isOffscreenListenerReady = false;
+    await createOffscreenDocument();
+    isOffscreenDocumentReady = true;
+    chrome.storage.local.set({ [SOUND_SUPPORT_STORAGE_KEY]: true });
+    if (chrome.offscreen?.hasDocument && !(await hasOffscreenDocument())) {
+      isOffscreenDocumentReady = false;
+      chrome.storage.local.set({ [SOUND_SUPPORT_STORAGE_KEY]: false });
+      return false;
+    }
+    return true;
+  } catch (error) {
+    // Chrome throws if an offscreen document already exists.
+    const message = String(error?.message ?? error);
+    if (/only a single offscreen document/i.test(message) || /already exists/i.test(message)) {
+      isOffscreenDocumentReady = true;
+      chrome.storage.local.set({ [SOUND_SUPPORT_STORAGE_KEY]: true });
+      return true;
+    }
+    if (DEBUG_MODE) console.error('Failed to create offscreen document:', error);
+    chrome.storage.local.set({ [SOUND_SUPPORT_STORAGE_KEY]: false });
+    return false;
+  }
+}
+
+/**
+ * Attempts to play a notification sound on macOS using an offscreen document.
+ * If audio cannot be played, a flag is stored so the UI can inform the user.
+ * @param {boolean} soundEnabled
+ */
+function playNotificationSoundIfNeeded(alarmName, soundEnabled) {
+  if (!soundEnabled) {
+    if (DEBUG_MODE) console.log('[sound] sound disabled; skip');
+    return;
+  }
+
+  getIsMacOS((isMacOS) => {
+    if (!isMacOS) {
+      if (DEBUG_MODE) console.log('[sound] non-macOS; rely on notification sound');
+      return;
+    }
+
+    if (DEBUG_MODE) console.log(`[sound] macOS detected; attempting offscreen beep (alarm=${alarmName})`);
+    ensureOffscreenDocument()
+      .then((ready) => {
+        if (DEBUG_MODE) console.log(`[sound] offscreen ready=${ready}`);
+        if (!ready) {
+          chrome.runtime.sendMessage({ action: 'soundPlaybackUnsupported' }, () => {});
+          return;
+        }
+        const sendDelayMs = 50;
+        const sendPlayMessage = (attempt) => {
+          chrome.runtime.sendMessage({ action: 'playNotificationSound', alarmName }, (response) => {
+            if (chrome.runtime.lastError) {
+              if (DEBUG_MODE) console.log('[sound] sendMessage error:', chrome.runtime.lastError);
+              if (DEBUG_MODE && chrome.runtime?.getContexts) {
+                chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'] }, (contexts) => {
+                  if (chrome.runtime.lastError) return;
+                  console.log('[sound] offscreen contexts:', contexts?.length ?? 0);
+                });
+              }
+
+              // Offscreen documents can be reclaimed by Chrome; retry once by recreating it.
+              if (attempt === 0) {
+                isOffscreenDocumentReady = false;
+                isOffscreenListenerReady = false;
+                ensureOffscreenDocument().then((retryReady) => {
+                  if (DEBUG_MODE) console.log(`[sound] offscreen retry ready=${retryReady}`);
+                  if (retryReady) {
+                    waitForOffscreenListenerReady().then(() => {
+                      setTimeout(() => sendPlayMessage(1), sendDelayMs);
+                    });
+                  }
+                });
+              }
+              return;
+            }
+            if (DEBUG_MODE) console.log('[sound] playNotificationSound response:', response);
+            isOffscreenListenerReady = true;
+          });
+        };
+        setTimeout(() => sendPlayMessage(0), sendDelayMs);
+      })
+      .catch(() => {
+        if (DEBUG_MODE) console.log('[sound] ensureOffscreenDocument threw; marking unsupported');
+        chrome.storage.local.set({ [SOUND_SUPPORT_STORAGE_KEY]: false });
+        chrome.runtime.sendMessage({ action: 'soundPlaybackUnsupported' }, () => {});
+      });
+  });
+}
+
+/**
+ * Determines if the current platform is macOS.
+ * Uses chrome.runtime.getPlatformInfo() when available and falls back to
+ * userAgent heuristics when necessary.
+ * @param {(isMacOS: boolean) => void} callback
+ */
+function getIsMacOS(callback) {
+  if (cachedIsMacOS !== null) {
+    callback(cachedIsMacOS);
+    return;
+  }
+
+  if (chrome.runtime?.getPlatformInfo) {
+    chrome.runtime.getPlatformInfo((platformInfo) => {
+      if (chrome.runtime.lastError) {
+        console.error('Failed to detect platform:', chrome.runtime.lastError);
+      } else if (platformInfo?.os) {
+        cachedIsMacOS = platformInfo.os === 'mac';
+        callback(cachedIsMacOS);
+        return;
+      }
+
+      cachedIsMacOS = /Mac|MacIntel/.test(navigator.userAgent);
+      callback(cachedIsMacOS);
+    });
+    return;
+  }
+
+  cachedIsMacOS = /Mac|MacIntel/.test(navigator.userAgent);
+  callback(cachedIsMacOS);
+}
 
 /**
  * Validates if a value is a valid alarm interval (1-120 minutes for one-time timers).
@@ -150,7 +438,7 @@ function createNotification(alarmName, soundEnabled, options = {}) {
     iconUrl: 'icons/icon128.png',
     title: 'Recharge',
     message: NOTIFICATION_MESSAGES[alarmName],
-    silent: !soundEnabled
+    silent: !(soundEnabled ?? DEFAULT_SOUND_ENABLED)
   };
   
   // Create a clean copy of options without any custom properties
@@ -158,13 +446,19 @@ function createNotification(alarmName, soundEnabled, options = {}) {
   const notificationOptions = { ...baseOptions, ...cleanOptions };
   const notificationId = isWater ? `water_${Date.now()}` : undefined;
   
-  chrome.notifications.create(notificationId, notificationOptions, (createdId) => {
+  const createCallback = (createdId) => {
     if (chrome.runtime.lastError) {
       console.error('Notification error:', chrome.runtime.lastError);
     } else if (DEBUG_MODE && createdId) {
       console.log(`Notification created with ID: ${createdId}`);
     }
-  });
+  };
+
+  if (notificationId) {
+    chrome.notifications.create(notificationId, notificationOptions, createCallback);
+  } else {
+    chrome.notifications.create(notificationOptions, createCallback);
+  }
   
   if (DEBUG_MODE) {
     console.log(`Notification created for ${alarmName}, sound ${soundEnabled ? 'enabled' : 'disabled'}`);
@@ -272,29 +566,44 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (DEBUG_MODE) console.log(`Alarm triggered: ${alarm.name}`);
   
   chrome.storage.sync.get(['soundEnabled'], (result) => {
+    const soundEnabled = result.soundEnabled ?? DEFAULT_SOUND_ENABLED;
+    playNotificationSoundIfNeeded(alarm.name, soundEnabled);
     if (alarm.name === 'water') {
       // Create notification with buttons for water alarm
-      // Detect if user is on macOS
-      const isMacOS = /Mac|MacIntel/.test(navigator.userAgent);
-      
-      if (DEBUG_MODE) console.log(`Platform detected: ${isMacOS ? 'macOS' : 'other'}, setting requireInteraction to ${!isMacOS}`);
-      
-      createNotification(alarm.name, result.soundEnabled, {
-        buttons: [
-          { title: 'Log Water' },
-          { title: 'Skip' }
-        ],
-        requireInteraction: !isMacOS, // Set to false on macOS, true on other platforms
-        isWater: true // This is a custom property that will be extracted before creating the notification
+      getIsMacOS((isMacOS) => {
+        if (DEBUG_MODE) console.log(`Platform detected: ${isMacOS ? 'macOS' : 'other'}, setting requireInteraction to ${!isMacOS}`);
+
+        createNotification(alarm.name, soundEnabled, {
+          silent: isMacOS ? true : !soundEnabled,
+          buttons: [
+            { title: 'Log Water' },
+            { title: 'Skip' }
+          ],
+          requireInteraction: !isMacOS, // Set to false on macOS, true on other platforms
+          isWater: true // This is a custom property that will be extracted before creating the notification
+        });
       });
     } else {
       // Regular notification for other alarms
-      createNotification(alarm.name, result.soundEnabled);
+      getIsMacOS((isMacOS) => {
+        createNotification(alarm.name, soundEnabled, {
+          silent: isMacOS ? true : !soundEnabled
+        });
+      });
     }
 
     if (alarm.name === 'oneTime') {
       // Notify popup that timer is complete
-      chrome.runtime.sendMessage({ action: 'timerComplete' });
+      chrome.runtime.sendMessage({ action: 'timerComplete' }, () => {
+        if (chrome.runtime.lastError) {
+          if (DEBUG_MODE) console.log('Popup not open, could not send timer complete message');
+        }
+      });
+      chrome.storage.local.remove([ONE_TIME_STATE_STORAGE_KEY], () => {
+        if (chrome.runtime.lastError) {
+          console.error('Failed to clear one-time timer state:', chrome.runtime.lastError);
+        }
+      });
     } else {
       // Restart repeating alarms as before
       chrome.storage.sync.get([`${alarm.name}Interval`], (result) => {
@@ -318,53 +627,70 @@ function updateAlarms(settings) {
 
   // Get existing alarms to compare
   chrome.alarms.getAll((existingAlarms) => {
-    // Create a map of existing alarms for easy lookup
-    const existingAlarmsMap = {};
-    existingAlarms.forEach(alarm => {
-      // Only map the repeating alarms (not oneTime)
-      if (alarm.name !== 'oneTime') {
-        existingAlarmsMap[alarm.name] = alarm;
-      }
-    });
+    const existingAlarmNames = new Set(
+      existingAlarms
+        .filter(alarm => alarm.name !== 'oneTime')
+        .map(alarm => alarm.name)
+    );
 
-    // Update alarms based on settings
-    alarmTypes.forEach(type => {
-      const isEnabled = settings[`${type}Enabled`];
-      const interval = settings[`${type}Interval`];
-
-      // Validate interval before creating alarm
-      if (isEnabled && !isValidRepeatingInterval(interval)) {
-        console.error(`Invalid ${type} interval: ${interval}. Must be between ${REPEATING_INTERVAL_MIN} and ${REPEATING_INTERVAL_MAX} minutes.`);
-        return;
+    chrome.storage.local.get([ALARM_STATE_STORAGE_KEY], (result) => {
+      if (chrome.runtime.lastError) {
+        console.error('Failed to read alarm state:', chrome.runtime.lastError);
       }
 
-      if (isEnabled && interval > 0) {
-        // Check if this alarm already exists
-        const existingAlarm = existingAlarmsMap[type];
+      const previousState = result?.[ALARM_STATE_STORAGE_KEY] ?? {};
+      const nextState = {};
 
-        // If alarm doesn't exist or settings have changed, create/update it
-        if (!existingAlarm) {
-          // Create new alarm
-          chrome.alarms.create(type, {
-            delayInMinutes: interval
-          });
+      // Update alarms based on settings
+      alarmTypes.forEach(type => {
+        const enabled = Boolean(settings[`${type}Enabled`]);
+        const interval = Number(settings[`${type}Interval`]);
+
+        nextState[type] = { enabled, interval };
+
+        // If alarm is disabled or interval is 0, clear it
+        if (!enabled || interval <= 0) {
+          chrome.alarms.clear(type);
+          if (DEBUG_MODE) console.log(`Cleared ${type} alarm (disabled or interval=0)`);
+          return;
+        }
+
+        // Validate interval before creating or rescheduling alarm
+        if (!isValidRepeatingInterval(interval)) {
+          console.error(`Invalid ${type} interval: ${interval}. Must be between ${REPEATING_INTERVAL_MIN} and ${REPEATING_INTERVAL_MAX} minutes.`);
+          chrome.alarms.clear(type);
+          return;
+        }
+
+        // Create new alarm if missing
+        if (!existingAlarmNames.has(type)) {
+          chrome.alarms.create(type, { delayInMinutes: interval });
           if (DEBUG_MODE) console.log(`Created ${type} alarm: ${interval} minutes`);
-        } else {
-          // Only clear and recreate if the interval has changed
+          return;
+        }
+
+        // Reschedule only when alarm-related settings have changed.
+        const previous = previousState[type];
+        const shouldReschedule = previous && (
+          Boolean(previous.enabled) !== enabled ||
+          Number(previous.interval) !== interval
+        );
+
+        if (shouldReschedule) {
           chrome.alarms.clear(type, (wasCleared) => {
             if (wasCleared) {
-              chrome.alarms.create(type, {
-                delayInMinutes: interval
-              });
+              chrome.alarms.create(type, { delayInMinutes: interval });
               if (DEBUG_MODE) console.log(`Updated ${type} alarm: ${interval} minutes`);
             }
           });
         }
-      } else {
-        // If alarm is disabled or interval is 0, clear it
-        chrome.alarms.clear(type);
-        if (DEBUG_MODE) console.log(`Cleared ${type} alarm (disabled or interval=0)`);
-      }
+      });
+
+      chrome.storage.local.set({ [ALARM_STATE_STORAGE_KEY]: nextState }, () => {
+        if (chrome.runtime.lastError) {
+          console.error('Failed to save alarm state:', chrome.runtime.lastError);
+        }
+      });
     });
   });
 }
@@ -377,6 +703,8 @@ if (typeof module !== 'undefined' && module.exports) {
     updateAlarms,
     createNotification,
     processWaterLogQueue,
-    handleWaterLogRetry
+    handleWaterLogRetry,
+    getIsMacOS,
+    playNotificationSoundIfNeeded
   };
 }

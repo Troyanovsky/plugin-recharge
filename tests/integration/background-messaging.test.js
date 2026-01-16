@@ -10,12 +10,19 @@ let onAlarmListener;
 let importCounter = 0;
 
 function buildChromeMock() {
+  const localStore = {};
+  let hasOffscreen = false;
   return {
     runtime: {
       onInstalled: { addListener: () => {} },
       onMessage: { addListener: (listener) => { onMessageListener = listener; } },
       sendMessage: () => {},
+      getPlatformInfo: (callback) => callback({ os: 'mac' }),
       lastError: null
+    },
+    offscreen: {
+      hasDocument: async () => hasOffscreen,
+      createDocument: async () => { hasOffscreen = true; }
     },
     alarms: {
       create: () => {},
@@ -29,6 +36,24 @@ function buildChromeMock() {
       onButtonClicked: { addListener: () => {} }
     },
     storage: {
+      local: {
+        get: (keys, callback) => {
+          if (Array.isArray(keys)) {
+            callback(Object.fromEntries(keys.map((key) => [key, localStore[key]])));
+            return;
+          }
+          callback({ [keys]: localStore[keys] });
+        },
+        set: (items, callback) => {
+          Object.assign(localStore, items);
+          callback?.();
+        },
+        remove: (keys, callback) => {
+          const keyList = Array.isArray(keys) ? keys : [keys];
+          keyList.forEach((key) => delete localStore[key]);
+          callback?.();
+        }
+      },
       sync: {
         get: () => {},
         set: () => {}
@@ -91,14 +116,14 @@ test('createOneTimeTimer message schedules a one-time alarm', () => {
 });
 
 test('one-time alarm notifies popup of completion', () => {
-  let sentMessage = null;
+  const sentMessages = [];
   global.chrome.storage.sync.get = (keys, callback) => callback({ soundEnabled: true });
-  global.chrome.runtime.sendMessage = (message) => { sentMessage = message; };
+  global.chrome.runtime.sendMessage = (message) => { sentMessages.push(message); };
   global.chrome.notifications.create = () => {};
 
   onAlarmListener({ name: 'oneTime' });
 
-  assert.deepEqual(sentMessage, { action: 'timerComplete' });
+  assert.ok(sentMessages.some((message) => message?.action === 'timerComplete'));
 });
 
 test('water alarm creates notification with buttons and macOS interaction settings', () => {

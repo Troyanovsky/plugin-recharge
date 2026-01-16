@@ -3,7 +3,7 @@
   "name": "Recharge - Healthy Work Break Reminders",
   "version": "1.2",
   "description": "Stay healthy at your desk with customizable reminders for eye breaks, hydration, movement, and stretching.",
-  "permissions": ["notifications", "storage", "alarms"],
+  "permissions": ["notifications", "storage", "alarms", "offscreen"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {

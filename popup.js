@@ -26,6 +26,11 @@ import {
   DEFAULT_STRETCH_ENABLED
 } from './constants.js';
 
+// Local-only state keys (do not sync across devices).
+const ONE_TIME_STATE_STORAGE_KEY = 'oneTimeStateV1';
+const SOUND_SUPPORT_STORAGE_KEY = 'soundPlaybackSupportedV1';
+const ONE_TIME_LAST_MINUTES_STORAGE_KEY = 'oneTimeLastMinutesV1';
+
 // Initialize slider min/max attributes from constants
 function initializeSliderConstraints() {
   // Repeating interval sliders (blink, water, up, stretch)
@@ -49,6 +54,53 @@ function initializeSliderConstraints() {
 function initializePopup() {
   // Initialize slider constraints from constants before loading settings
   initializeSliderConstraints();
+
+  const startTimerBtn = document.getElementById('startTimerBtn');
+  const oneTimeInterval = document.getElementById('oneTimeInterval');
+  const soundWarning = document.getElementById('soundWarning');
+  const oneTimeValue = document.getElementById('oneTimeValue');
+
+  let countdownInterval;
+  let oneTimeScheduledTime = null;
+
+  function setOneTimeSliderValue(minutes) {
+    const numericMinutes = Number(minutes);
+    if (Number.isNaN(numericMinutes)) {
+      return;
+    }
+    const clamped = Math.min(ONE_TIME_MAX, Math.max(ONE_TIME_MIN, numericMinutes));
+    oneTimeInterval.value = String(clamped);
+    if (oneTimeValue) {
+      oneTimeValue.textContent = String(clamped);
+    }
+  }
+
+  function clearCountdown() {
+    oneTimeScheduledTime = null;
+    clearInterval(countdownInterval);
+    startTimerBtn.disabled = false;
+    startTimerBtn.title = 'Start timer';
+    startTimerBtn.textContent = 'Start';
+    oneTimeInterval.disabled = false;
+  }
+
+  function startCountdown(scheduledTime) {
+    oneTimeScheduledTime = scheduledTime;
+    startTimerBtn.disabled = false;
+    startTimerBtn.title = 'Stop timer';
+    oneTimeInterval.disabled = true;
+
+    clearInterval(countdownInterval);
+    updateButtonCountdown(oneTimeScheduledTime);
+    countdownInterval = setInterval(() => updateButtonCountdown(oneTimeScheduledTime), 1000);
+  }
+
+  function updateSoundWarningVisibility(isSupported) {
+    if (!soundWarning) {
+      return;
+    }
+    soundWarning.style.display = isSupported === false ? 'block' : 'none';
+  }
 
   // Load saved settings
   chrome.storage.sync.get([
@@ -88,6 +140,13 @@ function initializePopup() {
     updateWaterLogBadge(waterLogCount);
   });
 
+  chrome.storage.local.get([SOUND_SUPPORT_STORAGE_KEY], (result) => {
+    if (chrome.runtime.lastError) {
+      return;
+    }
+    updateSoundWarningVisibility(result?.[SOUND_SUPPORT_STORAGE_KEY]);
+  });
+
   // Add event listeners for all inputs
   const inputs = document.querySelectorAll('input');
   inputs.forEach(input => {
@@ -101,36 +160,44 @@ function initializePopup() {
   });
 
   // Add one-time timer functionality
-  const startTimerBtn = document.getElementById('startTimerBtn');
-  const oneTimeInterval = document.getElementById('oneTimeInterval');
-  let countdownInterval;
-
   // Update one-time timer display
   oneTimeInterval.addEventListener('input', () => {
     document.getElementById('oneTimeValue').textContent = oneTimeInterval.value;
+    const minutes = parseInt(oneTimeInterval.value);
+    if (!isNaN(minutes)) {
+      chrome.storage.local.set({ [ONE_TIME_LAST_MINUTES_STORAGE_KEY]: minutes }, () => {});
+    }
   });
 
   startTimerBtn.addEventListener('click', () => {
+    if (oneTimeScheduledTime) {
+      chrome.runtime.sendMessage({ action: 'cancelOneTimeTimer' }, () => {
+        // Ignore delivery errors (popup may be closing) and reset UI locally.
+      });
+      chrome.storage.local.remove([ONE_TIME_STATE_STORAGE_KEY], () => {});
+      clearCountdown();
+      return;
+    }
+
     const minutes = parseInt(oneTimeInterval.value);
     if (isNaN(minutes) || minutes < ONE_TIME_MIN || minutes > ONE_TIME_MAX) {
       alert(`Invalid timer value: ${minutes}. Must be between ${ONE_TIME_MIN} and ${ONE_TIME_MAX} minutes.`);
       return;
     }
-    startTimerBtn.disabled = true;
 
     // Clear any existing interval to prevent memory leaks
     clearInterval(countdownInterval);
 
     // Calculate end time
     const endTime = Date.now() + minutes * 60 * 1000;
+    startCountdown(endTime);
 
-    // Update button text immediately
-    updateButtonCountdown(endTime);
-
-    // Set up countdown interval
-    countdownInterval = setInterval(() => {
-      updateButtonCountdown(endTime);
-    }, 1000);
+    chrome.storage.local.set({
+      [ONE_TIME_STATE_STORAGE_KEY]: { scheduledTime: endTime, durationMinutes: minutes },
+      [ONE_TIME_LAST_MINUTES_STORAGE_KEY]: minutes
+    }, () => {
+      // Ignore write errors; alarm state is still source-of-truth.
+    });
 
     // Send message to create one-time alarm
     chrome.runtime.sendMessage({
@@ -140,21 +207,63 @@ function initializePopup() {
       if (chrome.runtime.lastError) {
         console.error('Failed to create timer:', chrome.runtime.lastError);
         // Re-enable button and reset countdown on failure
-        startTimerBtn.disabled = false;
-        startTimerBtn.textContent = 'Start';
-        clearInterval(countdownInterval);
+        chrome.storage.local.remove([ONE_TIME_STATE_STORAGE_KEY], () => {});
+        clearCountdown();
       }
+    });
+  });
+
+  // Restore one-time timer state when popup is opened.
+  chrome.storage.local.get([ONE_TIME_STATE_STORAGE_KEY, ONE_TIME_LAST_MINUTES_STORAGE_KEY], (result) => {
+    if (chrome.runtime.lastError) {
+      return;
+    }
+
+    const lastMinutes = result?.[ONE_TIME_LAST_MINUTES_STORAGE_KEY];
+    if (typeof lastMinutes === 'number') {
+      setOneTimeSliderValue(lastMinutes);
+    }
+
+    const storedState = result?.[ONE_TIME_STATE_STORAGE_KEY];
+    const storedScheduledTime = storedState?.scheduledTime;
+    const storedDurationMinutes = storedState?.durationMinutes;
+
+    chrome.alarms.get('oneTime', (alarm) => {
+      const now = Date.now();
+      const scheduledTime = alarm?.scheduledTime ?? storedScheduledTime;
+
+      if (typeof scheduledTime === 'number' && scheduledTime > now) {
+        if (typeof storedDurationMinutes === 'number') {
+          setOneTimeSliderValue(storedDurationMinutes);
+        } else {
+          const remainingMinutes = Math.ceil((scheduledTime - now) / 60000);
+          setOneTimeSliderValue(remainingMinutes);
+        }
+
+        startCountdown(scheduledTime);
+        chrome.storage.local.set({
+          [ONE_TIME_STATE_STORAGE_KEY]: {
+            scheduledTime,
+            durationMinutes: typeof storedDurationMinutes === 'number' ? storedDurationMinutes : undefined
+          }
+        }, () => {});
+        return;
+      }
+
+      chrome.storage.local.remove([ONE_TIME_STATE_STORAGE_KEY], () => {});
+      clearCountdown();
     });
   });
 
   // Listen for timer completion and water logged events
   chrome.runtime.onMessage.addListener((message) => {
     if (message.action === 'timerComplete') {
-      startTimerBtn.disabled = false;
-      startTimerBtn.textContent = 'Start';
-      clearInterval(countdownInterval);
+      chrome.storage.local.remove([ONE_TIME_STATE_STORAGE_KEY], () => {});
+      clearCountdown();
     } else if (message.action === 'waterLogged') {
       updateWaterLogBadge(message.count);
+    } else if (message.action === 'soundPlaybackUnsupported') {
+      updateSoundWarningVisibility(false);
     }
   });
 

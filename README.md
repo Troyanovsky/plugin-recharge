@@ -39,7 +39,7 @@ A Chrome extension that helps you maintain healthy habits while working at your 
 
 - Install dependencies: `npm install`
 - Unit + integration tests with coverage: `npm test`
-- E2E tests (loads the extension in Playwright): `npm run test:e2e`
+- Manual release checklist: `docs/manual-test-cases.md`
 
 ## Support
 

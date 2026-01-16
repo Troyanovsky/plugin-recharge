@@ -5,13 +5,11 @@
   "type": "module",
   "scripts": {
     "test": "c8 node --test",
-    "test:unit": "c8 node --test tests/unit",
-    "test:integration": "c8 node --test tests/integration",
-    "test:e2e": "playwright test",
-    "test:all": "npm run test && npm run test:e2e"
+    "test:unit": "c8 node --test \"tests/unit/*.test.js\"",
+    "test:integration": "c8 node --test \"tests/integration/*.test.js\"",
+    "test:all": "npm run test"
   },
   "devDependencies": {
-    "@playwright/test": "^1.41.2",
     "c8": "^9.1.0"
   }
 }

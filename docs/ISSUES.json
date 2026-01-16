@@ -12,7 +12,7 @@
         "Code handles async nature of getPlatformInfo()",
         "Fallback handling if API unavailable"
       ],
-      "passes": false,
+      "passes": true,
       "file_references": ["background.js"],
       "severity": "medium"
     },
@@ -28,7 +28,7 @@
         "Consistent with waterLogged message pattern",
         "No console errors from failed message delivery"
       ],
-      "passes": false,
+      "passes": true,
       "file_references": ["background.js"],
       "severity": "low"
     },
@@ -44,7 +44,7 @@
         "Message response pattern follows Chrome API best practices",
         "Future async operations supported"
       ],
-      "passes": false,
+      "passes": true,
       "file_references": ["background.js"],
       "severity": "low"
     },
@@ -60,7 +60,7 @@
         "Security vulnerability addressed",
         "No changes to link behavior"
       ],
-      "passes": false,
+      "passes": true,
       "file_references": ["popup.html"],
       "severity": "low"
     },
@@ -162,7 +162,42 @@
         "Output is a zip file ready for Chrome Web Store upload",
         "Script documented in AGENTS.md"
       ],
-      "passes": false
+      "passes": true,
+      "file_references": ["build.sh", "AGENTS.md"]
+    },
+    {
+      "id": "BUG-250116-008",
+      "type": "bug",
+      "epic": "UI State Persistence",
+      "title": "One-time timer UI state lost when popup is reopened",
+      "description": "When a one-time timer is started, the countdown displays correctly while the popup remains open. However, closing and reopening the popup resets the UI to default state - both the timer slider and the start button reset without showing the active countdown. The notification still fires correctly at the set time, indicating the background alarm persists but the UI state is not persisted/restored.",
+      "acceptance_criteria": [
+        "One-time timer state is persisted to storage when started",
+        "Popup reads timer state on load to restore countdown display",
+        "Start button shows correct state (Start/Stop/Running) when popup reopens",
+        "Timer countdown continues from correct time after popup reopen",
+        "UI remains in sync with background alarm state",
+        "Edge case handled: timer completes while popup is closed"
+      ],
+      "passes": true,
+      "file_references": ["popup.js", "background.js"],
+      "severity": "medium"
+    },
+    {
+      "id": "BUG-250116-009",
+      "type": "bug",
+      "epic": "Notification Functionality",
+      "title": "Notification sound does not play on macOS",
+      "description": "When the notification sound toggle is enabled in the extension settings, no sound plays when notifications are triggered on macOS. The soundEnabled setting is stored correctly and can be toggled, but the audio feedback is not produced. This is a platform-specific issue that may be related to Chrome's notification API limitations on macOS or missing audio file handling.",
+      "acceptance_criteria": [
+        "Notification sound plays when sound toggle is enabled on macOS",
+        "Sound behavior consistent across platforms (macOS, Windows, Linux)",
+        "Fallback handling if platform doesn't support notification sounds",
+        "User is informed if sound cannot play on their platform"
+      ],
+      "passes": true,
+      "file_references": ["background.js", "manifest.json", "offscreen.html", "offscreen.js", "popup.html", "popup.js", "popup.css"],
+      "severity": "high"
     }
   ]
 }
